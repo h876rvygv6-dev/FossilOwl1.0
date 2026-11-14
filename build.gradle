@@ -33,9 +33,8 @@ repositories {
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
-    // The target instance already supplies these mods. Local jars are compile-time references only.
+    // Fossils and Archaeology is a runtime dependency only; this add-on references its registry IDs, not its Java classes.
     compileOnly files('libs/geckolib-forge-1.20.1-4.8.4.jar')
-    compileOnly files('libs/fossil-forge-1.20.1-9.3.4.0.jar')
 }
 
 processResources {
@@ -44,5 +43,13 @@ processResources {
 }
 
 jar {
-    manifest { attributes(['Specification-Title': 'Fossil Finder Owl', 'Specification-Vendor': 'Fossil Finder Owl', 'Specification-Version': '1', 'Implementation-Title': project.name, 'Implementation-Version': project.version]) }
+    manifest {
+        attributes([
+            'Specification-Title': 'Fossil Finder Owl',
+            'Specification-Vendor': 'Fossil Finder Owl',
+            'Specification-Version': '1',
+            'Implementation-Title': project.name,
+            'Implementation-Version': project.version
+        ])
+    }
 }
