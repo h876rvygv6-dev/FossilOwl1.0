@@ -28,6 +28,7 @@ minecraft {
 
 repositories {
     mavenCentral()
+    maven { url = 'https://maven.minecraftforge.net/' }
     maven { url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/' }
 }
 
