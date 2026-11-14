@@ -2,8 +2,8 @@ package com.saif.fossilfinder;
 
 import com.saif.fossilfinder.registry.OwlEntities;
 import com.saif.fossilfinder.registry.OwlItems;
+import com.saif.fossilfinder.registry.OwlMenus;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -22,6 +22,7 @@ public class FossilFinderOwl {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         OwlEntities.ENTITIES.register(modBus);
         OwlItems.ITEMS.register(modBus);
+        OwlMenus.MENUS.register(modBus);
 
         modBus.addListener(this::attributes);
         modBus.addListener(this::addCreativeTab);

@@ -1,5 +1,6 @@
 package com.saif.fossilfinder.entity;
 
+import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -31,7 +32,6 @@ import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ContainerListener;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -277,7 +277,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             SimpleContainer inventory = new SimpleContainer(27);
             for (int i = 0; i < cargo.size(); i++) inventory.setItem(i, cargo.get(i));
             serverPlayer.openMenu(new SimpleMenuProvider((id, playerInventory, viewer) ->
-                ChestMenu.threeRows(id, playerInventory, inventory), Component.literal("Owl Cargo")));
+                new OwlInventoryMenu(id, playerInventory, inventory), Component.literal("Owl Cargo")));
             serverPlayer.containerMenu.addSlotListener(new ContainerListener() {
                 @Override
                 public void slotChanged(AbstractContainerMenu menu, int slot, ItemStack stack) {
