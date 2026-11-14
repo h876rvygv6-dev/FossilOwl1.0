@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="All Rights Reserved"
+[[mods]]
+modId="fossil_finder_owl"
+version="${version}"
+displayName="Fossil Finder Owl"
+description='''A friendly palaeontologist owl companion that excavates Fossils and Archaeology deposits.'''
+[[dependencies.fossil_finder_owl]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.fossil_finder_owl]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.20.2)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.fossil_finder_owl]]
+modId="fossil"
+mandatory=true
+versionRange="[9.3.4.0,9.4)"
+ordering="AFTER"
+side="BOTH"
+[[dependencies.fossil_finder_owl]]
+modId="geckolib"
+mandatory=true
+versionRange="[4.8.4,)"
+ordering="AFTER"
+side="BOTH"

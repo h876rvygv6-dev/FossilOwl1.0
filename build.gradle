@@ -1,0 +1,48 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+version = '3.0.0-dev1'
+group = 'com.saif.fossilfinder'
+archivesBaseName = 'FossilFinderOwl-Forge'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    copyIdeResources = true
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods { fossil_finder_owl { source sourceSets.main } }
+        }
+        client {}
+        server { args '--nogui' }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/' }
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
+    // The target instance already supplies these mods. Local jars are compile-time references only.
+    compileOnly files('libs/geckolib-forge-1.20.1-4.8.4.jar')
+    compileOnly files('libs/fossil-forge-1.20.1-9.3.4.0.jar')
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/mods.toml') { expand 'version': project.version }
+}
+
+jar {
+    manifest { attributes(['Specification-Title': 'Fossil Finder Owl', 'Specification-Vendor': 'Fossil Finder Owl', 'Specification-Version': '1', 'Implementation-Title': project.name, 'Implementation-Version': project.version]) }
+}
