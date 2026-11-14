@@ -3,8 +3,10 @@ package com.saif.fossilfinder.entity;
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -14,6 +16,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -38,8 +41,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.registries.ForgeRegistries;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
@@ -60,6 +61,15 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         "fossil:tuff_fossil", "fossil:amber_ore", "fossil:fossil_ore");
     private static final Set<String> TAME_ITEMS = Set.of(
         "fossil:fossil_bio", "fossil:fossil_plant", "fossil:fossil_shale", "fossil:fossil_tar");
+    private static final Set<String> HEALING_FOODS = Set.of(
+        "minecraft:apple", "minecraft:carrot",
+        "minecraft:wheat_seeds", "minecraft:beetroot_seeds", "minecraft:melon_seeds",
+        "minecraft:pumpkin_seeds", "minecraft:torchflower_seeds", "minecraft:pitcher_pod",
+        "minecraft:cod", "minecraft:salmon", "minecraft:tropical_fish", "minecraft:pufferfish",
+        "minecraft:cooked_cod", "minecraft:cooked_salmon",
+        "minecraft:beef", "minecraft:cooked_beef", "minecraft:porkchop", "minecraft:cooked_porkchop",
+        "minecraft:mutton", "minecraft:cooked_mutton", "minecraft:chicken", "minecraft:cooked_chicken",
+        "minecraft:rabbit", "minecraft:cooked_rabbit");
     private static final ResourceLocation HOOT_ID = new ResourceLocation("fossil_finder_owl", "fossil_owl_hoot");
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
@@ -100,9 +110,13 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         goalSelector.addGoal(6, new RandomLookAroundGoal(this));
     }
 
+    @Override public boolean causeFall damage(float fallDistance, float multiplier, DamageSource source) {
+        return false;
+    }
+
     @Override protected SoundEvent getAmbientSound() { return sound(HOOT_ID); }
     @Override public int getAmbientSoundInterval() { return 120; }
-    @Override protected SoundEvent getHurtSound(net.minecraft.world.damagesource.DamageSource source) { return sound(HOOT_ID); }
+    @Override protected SoundEvent getHurtSound(DamageSource source) { return sound(HOOT_ID); }
     @Override protected SoundEvent getDeathSound() { return sound(HOOT_ID); }
     private static SoundEvent sound(ResourceLocation id) { return ForgeRegistries.SOUND_EVENTS.getValue(id); }
 
@@ -282,18 +296,14 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 @Override
                 public void slotChanged(AbstractContainerMenu menu, int slot, ItemStack stack) {
                     if (menu == serverPlayer.containerMenu) {
-                        for (int i = 0; i < cargo.size(); i++) {
-                            cargo.set(i, inventory.getItem(i).copy());
-                        }
+                        for (int i = 0; i < cargo.size(); i++) cargo.set(i, inventory.getItem(i).copy());
                     }
                 }
 
                 @Override
                 public void dataChanged(AbstractContainerMenu menu, int dataSlotIndex, int value) {
                     if (menu == serverPlayer.containerMenu) {
-                        for (int i = 0; i < cargo.size(); i++) {
-                            cargo.set(i, inventory.getItem(i).copy());
-                        }
+                        for (int i = 0; i < cargo.size(); i++) cargo.set(i, inventory.getItem(i).copy());
                     }
                 }
             });
@@ -312,6 +322,12 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return InteractionResult.CONSUME;
         }
         if (isTame() && isOwnedBy(player)) {
+            if (isHealingFood(held) && getHealth() < getMaxHealth()) {
+                heal(4.0F);
+                if (!player.getAbilities().instabuild) held.shrink(1);
+                player.displayClientMessage(Component.literal("Your owl looks healthier."), true);
+                return InteractionResult.CONSUME;
+            }
             if (held.is(Items.BONE)) {
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 setOrderedToSit(!isOrderedToSit());
@@ -339,6 +355,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             }
         }
         return super.mobInteract(player, hand);
+    }
+
+    private boolean isHealingFood(ItemStack stack) {
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        return id != null && HEALING_FOODS.contains(id.toString());
     }
 
     private boolean isLight(ItemStack stack) {
