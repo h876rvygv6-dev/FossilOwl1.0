@@ -341,6 +341,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 player.displayClientMessage(Component.literal(isOrderedToSit() ? "Your owl will perch here." : "Your owl will follow your expedition."), true);
                 return InteractionResult.CONSUME;
             }
+            if (isRejectedPickaxe(held)) {
+                player.displayClientMessage(Component.literal("Umm... not quite the right durability. My fossil-finding beak needs a sturdier pick!"), true);
+                return InteractionResult.CONSUME;
+            }
             if (isPickaxe(held)) {
                 setPickaxe(held.copyWithCount(1));
                 if (!player.getAbilities().instabuild) held.shrink(1);
@@ -362,9 +366,12 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         return super.mobInteract(player, hand);
     }
 
+    private boolean isRejectedPickaxe(ItemStack stack) {
+        return stack.is(Items.WOODEN_PICKAXE) || stack.is(Items.STONE_PICKAXE) || stack.is(Items.GOLDEN_PICKAXE);
+    }
+
     private boolean isPickaxe(ItemStack stack) {
-        return stack.is(Items.WOODEN_PICKAXE) || stack.is(Items.STONE_PICKAXE) || stack.is(Items.IRON_PICKAXE)
-            || stack.is(Items.GOLDEN_PICKAXE) || stack.is(Items.DIAMOND_PICKAXE) || stack.is(Items.NETHERITE_PICKAXE);
+        return stack.is(Items.IRON_PICKAXE) || stack.is(Items.DIAMOND_PICKAXE) || stack.is(Items.NETHERITE_PICKAXE);
     }
     private boolean isHealingFood(ItemStack stack) {
         ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
