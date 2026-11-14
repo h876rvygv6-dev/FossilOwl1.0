@@ -1,6 +1,5 @@
 package com.saif.fossilfinder.entity;
 
-import com.saif.fossilfinder.registry.OwlEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -11,26 +10,26 @@ import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MobType;
+import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.control.FlyingMoveControl;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.ai.goal.SitWhenOrderedToGoal;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.resources.ResourceLocation;
@@ -40,6 +39,7 @@ import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache
 import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.core.animation.AnimationController;
 import software.bernie.geckolib.core.animation.RawAnimation;
+import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
 import java.util.Set;
@@ -93,7 +93,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     @Override
     protected void registerGoals() {
         // No FollowOwnerGoal or stroll goal: the server tick below arbitrates all movement.
-        goalSelector.addGoal(1, new net.minecraft.world.entity.ai.goal.SitWhenOrderedToSitGoal(this));
+        goalSelector.addGoal(1, new SitWhenOrderedToGoal(this));
         goalSelector.addGoal(5, new LookAtPlayerGoal(this, Player.class, 10.0F));
         goalSelector.addGoal(6, new RandomLookAroundGoal(this));
     }
@@ -114,7 +114,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return;
         }
 
-        // Resume normal flight after the alarm state ends.
         setNoGravity(true);
         if (alarmCooldown > 0) alarmCooldown--;
 
@@ -138,7 +137,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             }
         }
 
-        // Follow at a comfortable offset; stop navigating once close enough.
         if (getOwner() instanceof Player owner) {
             double distance = distanceToSqr(owner);
             if (distance > 30.0) getNavigation().moveTo(owner, 1.0);
@@ -169,7 +167,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         excavating = false;
         target = null;
         setNoGravity(true);
-        // Climb above the threat and move away from it. Repath periodically, not every tick.
         if (tickCount % 12 == 0 || getNavigation().isDone()) {
             double dx = getX() - threat.getX();
             double dz = getZ() - threat.getZ();
@@ -191,7 +188,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     private void playHoot(boolean alarm) {
-        // The existing custom hoot asset is also used for the alarm call; alarm calls are louder/faster.
         playSound(ForgeRegistries.SOUND_EVENTS.getValue(
             new ResourceLocation("fossil_finder_owl", "fossil_owl_hoot")), alarm ? 1.5F : 0.8F,
             alarm ? 1.45F : 0.95F + random.nextFloat() * 0.15F);
@@ -358,7 +354,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 ? RawAnimation.begin().thenLoop("animation.owl.walk")
                 : RawAnimation.begin().thenLoop("animation.owl.idle"))));
         controllers.add(new AnimationController<>(this, "excavation", 0, state ->
-            excavating ? state.setAndContinue(RawAnimation.begin().thenLoop("animation.owl.dig")) : state.stop()));
+            excavating
+                ? state.setAndContinue(RawAnimation.begin().thenLoop("animation.owl.dig"))
+                : PlayState.STOP));
     }
 
     @Override public AnimatableInstanceCache getAnimatableInstanceCache() { return cache; }
