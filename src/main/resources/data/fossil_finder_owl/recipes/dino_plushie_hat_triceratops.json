@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": ["GGG", "WDW", "SSS"],
+  "key": { "G": { "item": "minecraft:green_wool" }, "W": { "item": "minecraft:white_wool" }, "D": { "item": "fossil:triceratops_dna" }, "S": { "item": "minecraft:string" } },
+  "result": { "item": "fossil_finder_owl:dino_plushie_hat_triceratops" }
+}

@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": ["OOO", "WDW", "SSS"],
+  "key": { "O": { "item": "minecraft:orange_wool" }, "W": { "item": "minecraft:white_wool" }, "D": { "item": "fossil:tyrannosaurus_dna" }, "S": { "item": "minecraft:string" } },
+  "result": { "item": "fossil_finder_owl:dino_plushie_hat_t_rex" }
+}

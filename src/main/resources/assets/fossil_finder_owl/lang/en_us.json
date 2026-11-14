@@ -1,5 +1,11 @@
 {
   "entity.fossil_finder_owl.fossil_finder_owl": "Fossil Finder Owl",
   "item.fossil_finder_owl.fossil_finder_owl_spawn_egg": "Fossil Finder Owl Spawn Egg",
+  "item.fossil_finder_owl.paleo_cowboy_hat": "Paleo Cowboy Hat",
+  "item.fossil_finder_owl.paleontologist_explorer_hat": "Paleontologist Explorer Hat",
+  "item.fossil_finder_owl.dino_plushie_hat_triceratops": "Dino Plushie Hat (Triceratops)",
+  "item.fossil_finder_owl.dino_plushie_hat_t_rex": "Dino Plushie Hat (T. rex)",
+  "item.fossil_finder_owl.dino_baseball_cap": "Dino Baseball Cap",
+  "item.fossil_finder_owl.dino_trucker_cap": "Dino Trucker Cap",
   "subtitles.fossil_finder_owl.owl_hoot": "Fossil Finder Owl hoots"
 }
