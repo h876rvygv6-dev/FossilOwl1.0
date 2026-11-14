@@ -108,7 +108,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     @Override
-    protected boolean causeFallDamage(float fallDistance, float multiplier, DamageSource source) {
+    public boolean causeFallDamage(float fallDistance, float multiplier, DamageSource source) {
         return false;
     }
 
