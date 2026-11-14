@@ -3,7 +3,6 @@ package com.saif.fossilfinder.entity;
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -50,7 +49,6 @@ import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
-import java.util.List;
 import java.util.Set;
 
 /** Server-authoritative fossil-finding companion. */
@@ -80,7 +78,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private int scanCooldown;
     private int digTicks;
     private int alarmCooldown;
-    private int phraseIndex;
     private boolean excavating;
 
     public FossilFinderOwlEntity(EntityType<FossilFinderOwlEntity> type, Level level) {
@@ -110,7 +107,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         goalSelector.addGoal(6, new RandomLookAroundGoal(this));
     }
 
-    @Override public boolean causeFall damage(float fallDistance, float multiplier, DamageSource source) {
+    @Override
+    protected boolean causeFallDamage(float fallDistance, float multiplier, DamageSource source) {
         return false;
     }
 
