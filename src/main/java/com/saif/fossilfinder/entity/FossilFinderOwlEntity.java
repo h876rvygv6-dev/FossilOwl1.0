@@ -30,7 +30,9 @@ import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.ContainerListener;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -47,6 +49,7 @@ import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
+import java.util.List;
 import java.util.Set;
 
 /** Server-authoritative fossil-finding companion. */
@@ -98,7 +101,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     @Override protected SoundEvent getAmbientSound() { return sound(HOOT_ID); }
-    @Override protected int getAmbientSoundInterval() { return 120; }
+    @Override public int getAmbientSoundInterval() { return 120; }
     @Override protected SoundEvent getHurtSound(net.minecraft.world.damagesource.DamageSource source) { return sound(HOOT_ID); }
     @Override protected SoundEvent getDeathSound() { return sound(HOOT_ID); }
     private static SoundEvent sound(ResourceLocation id) { return ForgeRegistries.SOUND_EVENTS.getValue(id); }
@@ -275,10 +278,23 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             for (int i = 0; i < cargo.size(); i++) inventory.setItem(i, cargo.get(i));
             serverPlayer.openMenu(new SimpleMenuProvider((id, playerInventory, viewer) ->
                 ChestMenu.threeRows(id, playerInventory, inventory), Component.literal("Owl Cargo")));
-            // Copy changes made in the screen back into the entity when the menu is closed.
-            serverPlayer.containerMenu.addSlotListener((menu, slot, stack) -> {
-                if (menu == serverPlayer.containerMenu) {
-                    for (int i = 0; i < cargo.size(); i++) cargo.set(i, inventory.getItem(i).copy());
+            serverPlayer.containerMenu.addSlotListener(new ContainerListener() {
+                @Override
+                public void slotChanged(AbstractContainerMenu menu, int slot, ItemStack stack) {
+                    if (menu == serverPlayer.containerMenu) {
+                        for (int i = 0; i < cargo.size(); i++) {
+                            cargo.set(i, inventory.getItem(i).copy());
+                        }
+                    }
+                }
+
+                @Override
+                public void dataChanged(AbstractContainerMenu menu, int dataSlotIndex, int value) {
+                    if (menu == serverPlayer.containerMenu) {
+                        for (int i = 0; i < cargo.size(); i++) {
+                            cargo.set(i, inventory.getItem(i).copy());
+                        }
+                    }
                 }
             });
         }
