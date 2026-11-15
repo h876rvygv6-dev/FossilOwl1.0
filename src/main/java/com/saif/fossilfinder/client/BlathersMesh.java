@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 
 final class BlathersMesh {
     private static final Gson GSON = new Gson();
-    private static final ResourceLocation MODEL = new ResourceLocation(FossilFinderOwl.MODID, "geo/blathers_mesh.json");
+    private static final ResourceLocation MODEL = new ResourceLocation(FossilFinderOwl.MODID, "models/entity/blathers_mesh.json");
     private final ModelData data;
 
     private BlathersMesh(ModelData data) {

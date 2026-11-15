@@ -249,7 +249,7 @@ def convert(archive, output_root):
             "meshes": meshes,
         }
         asset_root = Path(output_root) / "src/main/resources/assets/fossil_finder_owl"
-        mesh_path = asset_root / "geo/blathers_mesh.json"
+        mesh_path = asset_root / "models/entity/blathers_mesh.json"
         mesh_path.parent.mkdir(parents=True, exist_ok=True)
         mesh_path.write_text(json.dumps(model, separators=(",", ":")) + "\n", encoding="utf-8")
 
