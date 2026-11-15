@@ -19,7 +19,9 @@ public final class MuseumDialogue {
         SPECIES_DISPLAYED,
         NEEDS_SPECIMENS,
         NEEDS_FRAMES,
-        FRAME_UNREACHABLE
+        FRAME_UNREACHABLE,
+        GIFT_RECEIVED,
+        GIFT_REJECTED
     }
 
     public record Cue(CueType type, String species) {}
@@ -118,6 +120,31 @@ public final class MuseumDialogue {
         "A fine frame, inconveniently fenced off. Could you give me a clear approach?",
         "The fossil is ready; the route is not. Let us try a reachable frame."
     );
+    private static final List<String> HAT_GIFT_LINES = List.of(
+        "A new hat for museum duty! I feel ready to greet our distinguished visitors.",
+        "How splendid! This hat gives my curatorial opinions extra authority.",
+        "A thoughtful gift. I shall wear it for the opening of our next exhibit."
+    );
+    private static final List<String> LIGHT_GIFT_LINES = List.of(
+        "A light for the gallery! Our exhibits will be much easier to admire.",
+        "How thoughtful. Now I can inspect every fossil, even in the dim corners.",
+        "A lantern! The museum is brighter, and so is my curatorial spirit."
+    );
+    private static final List<String> HEALING_GIFT_LINES = List.of(
+        "Thank you for the care. Even a curator needs to mind their health.",
+        "Much better! I am ready to return to our very important exhibits.",
+        "That was kind of you. My feathers and my spirits are both recovering."
+    );
+    private static final List<String> REJECTED_GIFT_LINES = List.of(
+        "I appreciate the offer, but I need a sturdier pickaxe for excavation.",
+        "That tool will not manage fossil-bearing stone. Could I have a stronger pick?",
+        "A thoughtful offer, but that pickaxe is not quite suitable for our work."
+    );
+    private static final List<String> REJECTED_HAT_LINES = List.of(
+        "I can only wear one hat at a time, though I admire your enthusiasm.",
+        "Another hat? My head is scholarly, not especially spacious.",
+        "I appreciate the offer, but this hat already suits me rather well."
+    );
     private static final String[] SPECIES_PARTS = {
         "arm_bone", "bone", "bones", "feet", "foot", "leg_bone", "rib", "ribs",
         "ribcage", "skull", "tail", "vertebra", "vertebrae"
@@ -137,6 +164,25 @@ public final class MuseumDialogue {
             case NEEDS_SPECIMENS -> choose(NEEDS_SPECIMENS_LINES, variant);
             case NEEDS_FRAMES -> choose(NEEDS_FRAMES_LINES, variant);
             case FRAME_UNREACHABLE -> choose(FRAME_UNREACHABLE_LINES, variant);
+            case GIFT_RECEIVED -> choose(giftLines(cue.species()), variant);
+            case GIFT_REJECTED -> choose(rejectedGiftLines(cue.species()), variant);
+        };
+    }
+
+    private static List<String> giftLines(String gift) {
+        return switch (gift) {
+            case "hat" -> HAT_GIFT_LINES;
+            case "light" -> LIGHT_GIFT_LINES;
+            case "healing" -> HEALING_GIFT_LINES;
+            default -> throw new IllegalArgumentException("Unknown museum gift: " + gift);
+        };
+    }
+
+    private static List<String> rejectedGiftLines(String gift) {
+        return switch (gift) {
+            case "hat" -> REJECTED_HAT_LINES;
+            case "pickaxe" -> REJECTED_GIFT_LINES;
+            default -> throw new IllegalArgumentException("Unknown rejected museum gift: " + gift);
         };
     }
 

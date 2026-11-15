@@ -16,6 +16,7 @@ public final class FieldworkDialogue {
         HEALING,
         PICKAXE,
         REJECTED_PICKAXE,
+        REJECTED_HAT,
         LIGHT,
         STAY,
         FOLLOW,
@@ -112,6 +113,11 @@ public final class FieldworkDialogue {
         "That tool is a little too delicate for proper excavation.",
         "A stronger pick, please. Ancient stone is rather stubborn."
     );
+    private static final List<String> REJECTED_HAT = List.of(
+        "I can only wear one hat at a time, though I admire your enthusiasm.",
+        "Another hat? My head is scholarly, not especially spacious.",
+        "I appreciate the offer, but this hat already suits me rather well."
+    );
     private static final List<String> LIGHT = List.of(
         "A light for the expedition! You do think of everything.",
         "Thank you. The shadows may keep their secrets elsewhere.",
@@ -174,6 +180,7 @@ public final class FieldworkDialogue {
             case HEALING -> HEALING;
             case PICKAXE -> PICKAXE;
             case REJECTED_PICKAXE -> REJECTED_PICKAXE;
+            case REJECTED_HAT -> REJECTED_HAT;
             case LIGHT -> LIGHT;
             case STAY -> STAY;
             case FOLLOW -> FOLLOW;

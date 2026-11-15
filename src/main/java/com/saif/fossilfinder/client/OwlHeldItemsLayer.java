@@ -26,6 +26,9 @@ public class OwlHeldItemsLayer extends BlockAndItemGeoLayer<FossilFinderOwlEntit
 
     @Override
     protected ItemDisplayContext getTransformTypeForStack(GeoBone bone, ItemStack stack, FossilFinderOwlEntity owl) {
+        if (bone.getName().equals("left_hand") && owl.isInventoryPreviewRendering()) {
+            return ItemDisplayContext.FIXED;
+        }
         return switch (bone.getName()) {
             case "right_hand" -> ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
             case "left_hand" -> ItemDisplayContext.THIRD_PERSON_LEFT_HAND;

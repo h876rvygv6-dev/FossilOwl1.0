@@ -40,7 +40,7 @@ public final class OwlHatInteraction {
         ItemStack offered = event.getItemStack();
         if (!(offered.getItem() instanceof OwlHatItem) || !owl.isTame() || !owl.isOwnedBy(player)) return;
         if (!wornHat.isEmpty()) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal("I can only wear one hat at a time!"), true);
+            owl.reactToRejectedHat(player);
             cancel(event, InteractionResult.CONSUME);
             return;
         }

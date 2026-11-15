@@ -8,6 +8,7 @@ import com.saif.fossilfinder.museum.MuseumDialogue;
 import com.saif.fossilfinder.registry.OwlItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -20,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.Mth;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -130,6 +132,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private int fieldworkDiscoveryCooldown;
     private int fieldworkQuietTicks;
     private int fieldworkQuietCooldown;
+    private int upsetTicks;
+    private boolean inventoryPreviewRendering;
 
     public FossilFinderOwlEntity(EntityType<FossilFinderOwlEntity> type, Level level) {
         super(type, level);
@@ -158,6 +162,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     public ItemStack getPickaxeForRender() { return entityData.get(DATA_PICKAXE); }
     public ItemStack getLightForRender() { return entityData.get(DATA_LIGHT_ITEM); }
     public boolean isMuseumMode() { return entityData.get(DATA_MUSEUM_MODE); }
+    public boolean isInventoryPreviewRendering() { return inventoryPreviewRendering; }
+    public void setInventoryPreviewRendering(boolean inventoryPreviewRendering) {
+        this.inventoryPreviewRendering = inventoryPreviewRendering;
+    }
 
     private void setMuseumMode(boolean museumMode) {
         entityData.set(DATA_MUSEUM_MODE, museumMode);
@@ -195,6 +203,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     @Override public void tick() {
         super.tick();
         if (level().isClientSide) return;
+        if (upsetTicks > 0) {
+            upsetTicks--;
+            if (getOwner() instanceof Player owner) turnAwayFrom(owner);
+        }
         if (!isTame() || getOwner() == null) {
             target = null;
             setNoGravity(false);
@@ -318,6 +330,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (museumStatusCue == MuseumDialogue.CueType.NEEDS_SPECIMENS) clearMuseumStatus();
         if (museumDiscoveredSpecies.add(species)) {
             enqueueMuseumDialogue(MuseumDialogue.CueType.SPECIES_RECEIVED, species);
+            reactHappy();
         }
 
         ItemFrame frame = findMuseumFrame(species);
@@ -351,7 +364,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 enqueueMuseumDialogue(MuseumDialogue.CueType.SPECIES_DISPLAYED, species);
             }
             museumScanCooldown = 20;
-            triggerAnim("action", "dance");
+            reactHappy();
             playHoot(false);
         }
     }
@@ -456,6 +469,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             || (id.getNamespace().equals("fossil")
                 && (id.getPath().contains("fossil") || id.getPath().contains("amber"))))) {
             fieldworkMiningCount = 0;
+            reactHappy();
             if (fieldworkDiscoveryCooldown <= 0) {
                 queueFieldworkDialogue(FieldworkDialogue.Cue.OWNER_FOUND_FOSSIL);
                 fieldworkDiscoveryCooldown = 800;
@@ -480,7 +494,19 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     public void reactToHatGift() {
-        if (isTame() && !isMuseumMode()) queueFieldworkDialogue(FieldworkDialogue.Cue.HAT_GIFT);
+        if (!isTame()) return;
+        reactHappy();
+        if (isMuseumMode()) {
+            enqueueMuseumDialogue(MuseumDialogue.CueType.GIFT_RECEIVED, "hat");
+        } else {
+            queueFieldworkDialogue(FieldworkDialogue.Cue.HAT_GIFT);
+        }
+    }
+
+    public void reactToRejectedHat(Player player) {
+        if (isTame() && isOwnedBy(player)) {
+            reactUpset(player, FieldworkDialogue.Cue.REJECTED_HAT, "hat");
+        }
     }
 
     private void returnGift(Player player, ItemStack stack) {
@@ -493,6 +519,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!player.getAbilities().instabuild) held.shrink(1);
         returnGift(player, previousPickaxe);
         target = null;
+        reactHappy();
         queueFieldworkDialogue(FieldworkDialogue.Cue.PICKAXE);
     }
 
@@ -502,10 +529,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!player.getAbilities().instabuild) held.shrink(1);
         returnGift(player, previousLight);
         if (isMuseumMode()) {
-            player.displayClientMessage(Component.literal("A light for the expedition! You do think of everything."), true);
+            enqueueMuseumDialogue(MuseumDialogue.CueType.GIFT_RECEIVED, "light");
         } else {
             queueFieldworkDialogue(FieldworkDialogue.Cue.LIGHT);
         }
+        reactHappy();
     }
 
     private void enqueueMuseumDialogue(MuseumDialogue.CueType type, String species) {
@@ -517,8 +545,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (museumStatusCue != type) {
             museumStatusCue = type;
             museumStatusCooldown = 0;
-            museumDialogueQueue.removeIf(cue -> cue.type() != MuseumDialogue.CueType.SPECIES_RECEIVED
-                && cue.type() != MuseumDialogue.CueType.SPECIES_DISPLAYED);
+            museumDialogueQueue.removeIf(cue -> !isPriorityMuseumDialogue(cue));
         }
         if (museumStatusCooldown <= 0) {
             enqueueMuseumDialogue(type, "");
@@ -529,8 +556,44 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private void clearMuseumStatus() {
         museumStatusCue = null;
         museumStatusCooldown = 0;
-        museumDialogueQueue.removeIf(cue -> cue.type() != MuseumDialogue.CueType.SPECIES_RECEIVED
-            && cue.type() != MuseumDialogue.CueType.SPECIES_DISPLAYED);
+        museumDialogueQueue.removeIf(cue -> !isPriorityMuseumDialogue(cue));
+    }
+
+    private boolean isPriorityMuseumDialogue(MuseumDialogue.Cue cue) {
+        return cue.type() == MuseumDialogue.CueType.SPECIES_RECEIVED
+            || cue.type() == MuseumDialogue.CueType.SPECIES_DISPLAYED
+            || cue.type() == MuseumDialogue.CueType.GIFT_RECEIVED
+            || cue.type() == MuseumDialogue.CueType.GIFT_REJECTED;
+    }
+
+    private void reactHappy() {
+        triggerAnim("action", "dance");
+        if (level() instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.HEART, getX(), getY() + getBbHeight() * 0.75, getZ(),
+                7, 0.35, 0.35, 0.35, 0.02);
+        }
+    }
+
+    private void reactUpset(Player player, FieldworkDialogue.Cue fieldworkCue, String museumGift) {
+        upsetTicks = 40;
+        turnAwayFrom(player);
+        if (level() instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.SMOKE, getX(), getY() + getBbHeight() * 0.75, getZ(),
+                7, 0.3, 0.35, 0.3, 0.02);
+        }
+        if (isMuseumMode()) {
+            enqueueMuseumDialogue(MuseumDialogue.CueType.GIFT_REJECTED, museumGift);
+        } else {
+            queueFieldworkDialogue(fieldworkCue);
+        }
+    }
+
+    private void turnAwayFrom(Player player) {
+        float yaw = (float) (Mth.atan2(getZ() - player.getZ(), getX() - player.getX())
+            * (180.0 / Math.PI)) - 90.0F;
+        setYRot(yaw);
+        setYHeadRot(yaw);
+        setYBodyRot(yaw);
     }
 
     private Monster findNearbyHostile() {
@@ -631,7 +694,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             queueFieldworkDialogue(FieldworkDialogue.Cue.OWL_FOUND_FOSSIL);
             fieldworkDiscoveryCooldown = 800;
         }
-        triggerAnim("action", "dance");
+        reactHappy();
         pickaxe.hurtAndBreak(1, this, entity -> setPickaxe(ItemStack.EMPTY));
         setPickaxe(pickaxe);
         playHoot(false);
@@ -723,7 +786,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (!player.getAbilities().instabuild) held.shrink(1);
             tame(player);
             setOrderedToSit(false);
-            level().broadcastEntityEvent(this, (byte) 7);
+            reactHappy();
             queueFieldworkDialogue(FieldworkDialogue.Cue.TAMED);
             return InteractionResult.CONSUME;
         }
@@ -763,15 +826,17 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 setPickaxe(newPickaxe);
                 returnGift(player, previousPickaxe);
+                reactHappy();
                 stopMuseumMode(player);
+                queueFieldworkDialogue(FieldworkDialogue.Cue.PICKAXE);
                 return InteractionResult.CONSUME;
             }
             if (isHealingFood(held) && getHealth() < getMaxHealth()) {
                 heal(4.0F);
                 if (!player.getAbilities().instabuild) held.shrink(1);
-                triggerAnim("action", "dance");
+                reactHappy();
                 if (isMuseumMode()) {
-                    player.displayClientMessage(Component.literal("Your owl looks healthier."), true);
+                    enqueueMuseumDialogue(MuseumDialogue.CueType.GIFT_RECEIVED, "healing");
                 } else {
                     queueFieldworkDialogue(FieldworkDialogue.Cue.HEALING);
                 }
@@ -794,12 +859,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 return InteractionResult.CONSUME;
             }
             if (isRejectedPickaxe(held)) {
-                if (isMuseumMode()) {
-                    player.displayClientMessage(Component.literal(
-                        "Umm... not quite the right durability. My fossil-finding beak needs a sturdier pick!"), true);
-                } else {
-                    queueFieldworkDialogue(FieldworkDialogue.Cue.REJECTED_PICKAXE);
-                }
+                reactUpset(player, FieldworkDialogue.Cue.REJECTED_PICKAXE, "pickaxe");
                 return InteractionResult.CONSUME;
             }
             if (isPickaxe(held)) {

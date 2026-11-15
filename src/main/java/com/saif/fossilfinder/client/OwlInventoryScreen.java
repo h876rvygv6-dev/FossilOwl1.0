@@ -27,8 +27,13 @@ public class OwlInventoryScreen extends AbstractContainerScreen<OwlInventoryMenu
             && minecraft.level.getEntity(menu.getOwlEntityId()) instanceof FossilFinderOwlEntity owl) {
             int previewX = leftPos + 47;
             int previewY = topPos + 37;
-            InventoryScreen.renderEntityInInventoryFollowsMouse(
-                graphics, previewX, previewY, 28, previewX - mouseX, previewY - mouseY, owl);
+            owl.setInventoryPreviewRendering(true);
+            try {
+                InventoryScreen.renderEntityInInventoryFollowsMouse(
+                    graphics, previewX, previewY, 28, previewX - mouseX, previewY - mouseY, owl);
+            } finally {
+                owl.setInventoryPreviewRendering(false);
+            }
         }
     }
 

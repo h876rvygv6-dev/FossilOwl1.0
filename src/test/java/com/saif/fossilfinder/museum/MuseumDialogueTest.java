@@ -25,6 +25,13 @@ class MuseumDialogueTest {
         String reaction = MuseumDialogue.line(tyrannosaurus, null, 0, 0);
         assertTrue(reaction.contains("EEEEEEEK!"));
 
+        String lightGift = MuseumDialogue.line(
+            new MuseumDialogue.Cue(MuseumDialogue.CueType.GIFT_RECEIVED, "light"), null, 0, 0);
+        assertTrue(lightGift.contains("light") || lightGift.contains("lantern"));
+        String rejectedHat = MuseumDialogue.line(
+            new MuseumDialogue.Cue(MuseumDialogue.CueType.GIFT_REJECTED, "hat"), null, 0, 0);
+        assertTrue(rejectedHat.contains("hat"));
+
         assertEquals("Alligator Gar",
             MuseumDialogue.displayName("alligator_gar"));
         assertTrue(MuseumDialogue.isSpeciesPart("bone_unique_tyrannosaurus", "tyrannosaurus"));
