@@ -1,6 +1,6 @@
 {
   "type": "minecraft:crafting_shaped",
-  "pattern": ["LLL", "LBL", "SSS"],
-  "key": { "L": { "item": "minecraft:leather" }, "B": { "item": "fossil:fossil_bio" }, "S": { "item": "minecraft:string" } },
+  "pattern": ["WWW", "LBL", "SSS"],
+  "key": { "W": { "item": "minecraft:white_wool" }, "L": { "item": "minecraft:leather" }, "B": { "item": "fossil:fossil_bio" }, "S": { "item": "minecraft:string" } },
   "result": { "item": "fossil_finder_owl:paleontologist_explorer_hat" }
 }

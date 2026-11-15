@@ -20,6 +20,7 @@ public final class OwlHatInteraction {
     public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (!(event.getTarget() instanceof FossilFinderOwlEntity owl)) return;
         Player player = event.getEntity();
+        if (player.level().isClientSide) return;
         ItemStack wornHat = owl.getItemBySlot(EquipmentSlot.HEAD);
 
         if (player.isCrouching() && event.getItemStack().isEmpty() && wornHat.getItem() instanceof OwlHatItem) {

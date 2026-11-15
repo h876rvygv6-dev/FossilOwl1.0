@@ -19,7 +19,6 @@ public class OwlHeldItemsLayer extends BlockAndItemGeoLayer<FossilFinderOwlEntit
         return switch (bone.getName()) {
             case "right_hand" -> owl.getPickaxeForRender();
             case "left_hand" -> owl.getLightForRender();
-            // Reserved for a future hat/helmet interaction.
             case "head_item" -> owl.getItemBySlot(EquipmentSlot.HEAD);
             default -> null;
         };

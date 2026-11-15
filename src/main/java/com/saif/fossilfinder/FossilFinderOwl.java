@@ -46,5 +46,13 @@ public class FossilFinderOwl {
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(OwlItems.SPAWN_EGG);
         }
+        if (event.getTabKey() == CreativeModeTabs.COMBAT) {
+            event.accept(OwlItems.PALEO_COWBOY_HAT);
+            event.accept(OwlItems.PALEONTOLOGIST_EXPLORER_HAT);
+            event.accept(OwlItems.TRICERATOPS_PLUSHIE_HAT);
+            event.accept(OwlItems.T_REX_PLUSHIE_HAT);
+            event.accept(OwlItems.DINO_BASEBALL_CAP);
+            event.accept(OwlItems.DINO_TRUCKER_CAP);
+        }
     }
 }

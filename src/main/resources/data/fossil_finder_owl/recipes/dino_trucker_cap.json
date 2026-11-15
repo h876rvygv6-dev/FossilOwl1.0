@@ -1,6 +1,6 @@
 {
   "type": "minecraft:crafting_shaped",
-  "pattern": ["WWW", "LBL", "SSS"],
-  "key": { "W": { "item": "minecraft:white_wool" }, "L": { "item": "minecraft:leather" }, "B": { "item": "fossil:fossil_bio" }, "S": { "item": "minecraft:string" } },
+  "pattern": ["CWC", "LFL", "SSS"],
+  "key": { "C": { "item": "minecraft:brown_wool" }, "W": { "item": "minecraft:white_wool" }, "L": { "item": "minecraft:leather" }, "F": { "item": "fossil:fossil_bio" }, "S": { "item": "minecraft:string" } },
   "result": { "item": "fossil_finder_owl:dino_trucker_cap" }
 }

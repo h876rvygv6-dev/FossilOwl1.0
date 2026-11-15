@@ -1,24 +1,9 @@
 {
-  "credit": "Fossil Finder Owl hat model",
+  "parent": "minecraft:item/generated",
   "textures": {
-    "brown": "minecraft:block/brown_wool",
-    "band": "minecraft:block/orange_wool",
-    "badge": "minecraft:block/yellow_wool"
+    "layer0": "fossil_finder_owl:item/paleo_cowboy_hat"
   },
-  "elements": [
-    {"from":[3,6,4],"to":[13,12,12],"faces":{"north":{"texture":"#brown"},"south":{"texture":"#brown"},"east":{"texture":"#brown"},"west":{"texture":"#brown"},"up":{"texture":"#brown"},"down":{"texture":"#brown"}}},
-    {"from":[2,4,2],"to":[14,6,14],"faces":{"north":{"texture":"#brown"},"south":{"texture":"#brown"},"east":{"texture":"#brown"},"west":{"texture":"#brown"},"up":{"texture":"#brown"},"down":{"texture":"#brown"}}},
-    {"from":[1,3,1],"to":[15,5,15],"faces":{"north":{"texture":"#brown"},"south":{"texture":"#brown"},"east":{"texture":"#brown"},"west":{"texture":"#brown"},"up":{"texture":"#brown"},"down":{"texture":"#brown"}}},
-    {"from":[3,6,3],"to":[13,7,13],"faces":{"north":{"texture":"#band"},"south":{"texture":"#band"},"east":{"texture":"#band"},"west":{"texture":"#band"},"up":{"texture":"#band"},"down":{"texture":"#band"}}},
-    {"from":[6,6,1],"to":[10,9,2],"faces":{"north":{"texture":"#badge"},"south":{"texture":"#badge"},"east":{"texture":"#badge"},"west":{"texture":"#badge"},"up":{"texture":"#badge"},"down":{"texture":"#badge"}}}
-  ],
   "display": {
-    "gui":{"rotation":[25,225,0],"translation":[0,1,0],"scale":[0.85,0.85,0.85]},
-    "ground":{"translation":[0,2,0],"scale":[0.5,0.5,0.5]},
-    "thirdperson_righthand":{"rotation":[0,90,0],"translation":[0,2,1],"scale":[0.55,0.55,0.55]},
-    "thirdperson_lefthand":{"rotation":[0,90,0],"translation":[0,2,1],"scale":[0.55,0.55,0.55]},
-    "firstperson_righthand":{"rotation":[0,90,0],"translation":[1,2,1],"scale":[0.55,0.55,0.55]},
-    "firstperson_lefthand":{"rotation":[0,90,0],"translation":[1,2,1],"scale":[0.55,0.55,0.55]},
-    "fixed":{"rotation":[0,180,0],"translation":[0,0,0],"scale":[0.8,0.8,0.8]}
+    "head": {"rotation": [0, 180, 0], "translation": [0, 4, 0], "scale": [1, 1, 1]}
   }
 }

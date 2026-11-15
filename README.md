@@ -16,6 +16,8 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 
 ## In-game access
 - Creative inventory: spawn egg named **Blathers Spawn Egg**.
+- Creative inventory: all six supplied pixel-art hat sprites are in the Combat tab. Equip one in the player's helmet slot or use it on an owned Blathers; crouch and interact empty-handed to retrieve the owl's hat.
+- Hat recipes use leather, string, wool, and Fossils and Archaeology items. Hats are durable, grant +6 maximum health (+10 for the dinosaur plushie hats), and do not provide armor protection.
 - Command: `/summon fossil_finder_owl:fossil_finder_owl ~ ~ ~`
 - Tame: right-click with one of `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, or `fossil:fossil_tar`.
 - Assign tool: right-click the tamed owl with an iron pickaxe.
