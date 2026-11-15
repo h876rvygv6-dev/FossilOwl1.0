@@ -44,6 +44,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.network.NetworkHooks;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
@@ -383,7 +384,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     private void openCargo(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
-            serverPlayer.openMenu(new SimpleMenuProvider((id, playerInventory, viewer) ->
+            NetworkHooks.openScreen(serverPlayer, new SimpleMenuProvider((id, playerInventory, viewer) ->
                 new OwlInventoryMenu(id, playerInventory, cargo, pickaxeContainer, getId()),
                 Component.literal("Fossil Finder Owl")), buffer -> buffer.writeVarInt(getId()));
         }
