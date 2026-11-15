@@ -2,7 +2,6 @@ package com.saif.fossilfinder.entity;
 
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -36,8 +35,6 @@ import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ContainerListener;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -59,9 +56,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private static final EntityDataAccessor<ItemStack> DATA_PICKAXE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> DATA_LIGHT_ITEM = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final Set<String> FOSSIL_BLOCKS = Set.of(
-        "fossil:stone_fossil", "fossil:deepslate_fossil", "fossil:calcite_fossil",
-        "fossil:dripstone_fossil", "fossil:sandstone_fossil", "fossil:red_sandstone_fossil",
-        "fossil:tuff_fossil", "fossil:amber_ore", "fossil:fossil_ore");
+        "fossil:fossil_stone", "fossil:fossil_deepslate", "fossil:fossil_calcite",
+        "fossil:fossil_dripstone", "fossil:fossil_sandstone", "fossil:fossil_red_sandstone",
+        "fossil:fossil_tuff", "fossil:amber_ore", "fossil:fossil_ore");
     private static final Set<String> TAME_ITEMS = Set.of(
         "fossil:fossil_bio", "fossil:fossil_plant", "fossil:fossil_shale", "fossil:fossil_tar");
     private static final Set<String> HEALING_FOODS = Set.of(
@@ -74,7 +71,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private static final ResourceLocation HOOT_ID = new ResourceLocation("fossil_finder_owl", "fossil_owl_hoot");
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
-    private final NonNullList<ItemStack> cargo = NonNullList.withSize(27, ItemStack.EMPTY);
+    private final SimpleContainer cargo = new SimpleContainer(27);
     private ItemStack pickaxe = ItemStack.EMPTY;
     private ItemStack lightItem = ItemStack.EMPTY;
     private BlockPos target;
@@ -140,7 +137,17 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     @Override public void tick() {
         super.tick();
         if (level().isClientSide) return;
-        if (!isTame() || isOrderedToSit() || getOwner() == null) {
+        if (!isTame() || getOwner() == null) {
+            target = null;
+            excavating = false;
+            setNoGravity(false);
+            return;
+        }
+        if (isOrderedToSit()) {
+            target = null;
+            digTicks = 0;
+            excavating = false;
+            getNavigation().stop();
             setNoGravity(false);
             return;
         }
@@ -151,6 +158,19 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         }
         setNoGravity(true);
         if (alarmCooldown > 0) alarmCooldown--;
+        collectNearbyDrops();
+        if (getOwner() instanceof Player owner && distanceToSqr(owner) > 64.0) {
+            target = null;
+            digTicks = 0;
+            excavating = false;
+            if (distanceToSqr(owner) > 400.0) {
+                teleportTo(owner.getX() + 1.0, owner.getY() + 1.0, owner.getZ() + 1.0);
+                getNavigation().stop();
+            } else if (getNavigation().isDone() || tickCount % 10 == 0) {
+                getNavigation().moveTo(owner, 1.0);
+            }
+            return;
+        }
         if (cargoFull()) {
             target = null;
             returnToOwner();
@@ -239,7 +259,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     private void returnToOwner() {
-        if (getOwner() instanceof Player owner && distanceToSqr(owner) > 8.0) getNavigation().moveTo(owner, 1.0);
+        if (getOwner() instanceof Player owner) {
+            if (distanceToSqr(owner) > 16.0) getNavigation().moveTo(owner, 1.0);
+            else getNavigation().stop();
+        }
     }
 
     private BlockPos findFossil() {
@@ -267,7 +290,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         BlockState state = level().getBlockState(target);
         if (!isFossilBlock(state)) return;
         BlockPos minedPos = target;
-        for (ItemStack drop : Block.getDrops(state, serverLevel, minedPos, level().getBlockEntity(minedPos), this, pickaxe)) {
+        var breaker = getOwner();
+        if (breaker == null) breaker = this;
+        for (ItemStack drop : Block.getDrops(state, serverLevel, minedPos, level().getBlockEntity(minedPos), breaker, pickaxe)) {
             ItemStack remainder = addCargo(drop);
             if (!remainder.isEmpty()) level().addFreshEntity(new ItemEntity(level(), minedPos.getX() + 0.5, minedPos.getY() + 0.5, minedPos.getZ() + 0.5, remainder));
         }
@@ -278,41 +303,46 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (cargoFull() || pickaxe.isEmpty()) returnToOwner();
     }
 
+    private void collectNearbyDrops() {
+        for (ItemEntity itemEntity : level().getEntitiesOfClass(ItemEntity.class, getBoundingBox().inflate(1.25))) {
+            if (!itemEntity.isAlive()) continue;
+            ItemStack item = itemEntity.getItem();
+            ItemStack remainder = addCargo(item);
+            if (remainder.getCount() == item.getCount()) continue;
+            itemEntity.setItem(remainder);
+            if (remainder.isEmpty()) itemEntity.discard();
+        }
+    }
+
     private ItemStack addCargo(ItemStack stack) {
         ItemStack remaining = stack.copy();
-        for (int i = 0; i < cargo.size() && !remaining.isEmpty(); i++) {
-            ItemStack slot = cargo.get(i);
+        for (int i = 0; i < cargo.getContainerSize() && !remaining.isEmpty(); i++) {
+            ItemStack slot = cargo.getItem(i);
             if (!slot.isEmpty() && ItemStack.isSameItemSameTags(slot, remaining) && slot.getCount() < slot.getMaxStackSize()) {
                 int moved = Math.min(remaining.getCount(), slot.getMaxStackSize() - slot.getCount());
                 slot.grow(moved);
+                cargo.setChanged();
                 remaining.shrink(moved);
             }
         }
-        for (int i = 0; i < cargo.size() && !remaining.isEmpty(); i++) {
-            if (cargo.get(i).isEmpty()) {
+        for (int i = 0; i < cargo.getContainerSize() && !remaining.isEmpty(); i++) {
+            if (cargo.getItem(i).isEmpty()) {
                 int moved = Math.min(remaining.getCount(), remaining.getMaxStackSize());
-                cargo.set(i, remaining.copyWithCount(moved));
+                cargo.setItem(i, remaining.copyWithCount(moved));
                 remaining.shrink(moved);
             }
         }
         return remaining;
     }
 
-    private boolean cargoFull() { return cargo.stream().allMatch(stack -> !stack.isEmpty() && stack.getCount() >= stack.getMaxStackSize()); }
+    private boolean cargoFull() {
+        return cargo.getItems().stream().allMatch(stack -> !stack.isEmpty() && stack.getCount() >= stack.getMaxStackSize());
+    }
 
     private void openCargo(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
-            SimpleContainer inventory = new SimpleContainer(27);
-            for (int i = 0; i < cargo.size(); i++) inventory.setItem(i, cargo.get(i));
             serverPlayer.openMenu(new SimpleMenuProvider((id, playerInventory, viewer) ->
-                new OwlInventoryMenu(id, playerInventory, inventory), Component.literal("Owl Cargo")));
-            serverPlayer.containerMenu.addSlotListener(new ContainerListener() {
-                @Override public void slotChanged(AbstractContainerMenu menu, int slot, ItemStack stack) { syncCargo(menu, serverPlayer, inventory); }
-                @Override public void dataChanged(AbstractContainerMenu menu, int dataSlotIndex, int value) { syncCargo(menu, serverPlayer, inventory); }
-                private void syncCargo(AbstractContainerMenu menu, ServerPlayer viewer, SimpleContainer container) {
-                    if (menu == viewer.containerMenu) for (int i = 0; i < cargo.size(); i++) cargo.set(i, container.getItem(i).copy());
-                }
-            });
+                new OwlInventoryMenu(id, playerInventory, cargo), Component.literal("Owl Cargo")));
         }
     }
 
@@ -338,6 +368,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 setOrderedToSit(!isOrderedToSit());
                 target = null;
+                digTicks = 0;
+                excavating = false;
+                getNavigation().stop();
                 player.displayClientMessage(Component.literal(isOrderedToSit() ? "Your owl will perch here." : "Your owl will follow your expedition."), true);
                 return InteractionResult.CONSUME;
             }
@@ -387,14 +420,15 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     @Override public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.put("Cargo", ContainerHelper.saveAllItems(new CompoundTag(), cargo));
+        tag.put("Cargo", ContainerHelper.saveAllItems(new CompoundTag(), cargo.getItems()));
         if (!pickaxe.isEmpty()) tag.put("Pickaxe", pickaxe.save(new CompoundTag()));
         if (!lightItem.isEmpty()) tag.put("LightItem", lightItem.save(new CompoundTag()));
         if (target != null) tag.putLong("Target", target.asLong());
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.contains("Cargo")) ContainerHelper.loadAllItems(tag.getCompound("Cargo"), cargo);
+        if (tag.contains("Cargo")) ContainerHelper.loadAllItems(tag.getCompound("Cargo"), cargo.getItems());
+        cargo.setChanged();
         setPickaxe(tag.contains("Pickaxe") ? ItemStack.of(tag.getCompound("Pickaxe")) : ItemStack.EMPTY);
         setLightItem(tag.contains("LightItem") ? ItemStack.of(tag.getCompound("LightItem")) : ItemStack.EMPTY);
         if (tag.contains("Target")) target = BlockPos.of(tag.getLong("Target"));
