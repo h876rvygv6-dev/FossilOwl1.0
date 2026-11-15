@@ -174,9 +174,9 @@ public final class MuseumDialogue {
                 System.Logger.Level.WARNING, "No Dinopedia entry found for {0}", species);
             return List.of();
         }
-        try (Resource entry = resource.get();
-             BufferedReader reader = new BufferedReader(
-                 new InputStreamReader(entry.open(), StandardCharsets.UTF_8))) {
+        Resource entry = resource.get();
+        try (BufferedReader reader = new BufferedReader(
+            new InputStreamReader(entry.open(), StandardCharsets.UTF_8))) {
             return sentences(reader.lines().reduce("", (first, next) -> first.isEmpty() ? next : first + " " + next));
         } catch (IOException exception) {
             System.getLogger(MuseumDialogue.class.getName()).log(
