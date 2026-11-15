@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "P": {
+      "item": "fossil:pottery_shard"
+    }
+  },
+  "pattern": [
+    "P P",
+    "P P",
+    "PPP"
+  ],
+  "result": {
+    "item": "fossil:vase_volute_damaged"
+  },
+  "show_notification": true
+}
