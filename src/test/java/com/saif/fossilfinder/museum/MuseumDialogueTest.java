@@ -16,6 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MuseumDialogueTest {
     @Test
     void givesSpeciesSpecificReactionsAndPlacementFacts() {
+        String welcome = MuseumDialogue.line(
+            new MuseumDialogue.Cue(MuseumDialogue.CueType.MODE_STARTED, ""), null, 0, 0);
+        assertTrue(welcome.contains("Museum Mode"));
+
         var tyrannosaurus = new MuseumDialogue.Cue(
             MuseumDialogue.CueType.SPECIES_RECEIVED, "tyrannosaurus");
         String reaction = MuseumDialogue.line(tyrannosaurus, null, 0, 0);

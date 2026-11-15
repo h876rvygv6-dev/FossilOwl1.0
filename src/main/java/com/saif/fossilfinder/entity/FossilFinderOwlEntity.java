@@ -286,6 +286,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             followOwner(owner);
             return;
         }
+        if (museumStatusCue == MuseumDialogue.CueType.NEEDS_SPECIMENS) clearMuseumStatus();
         if (museumDiscoveredSpecies.add(species)) {
             enqueueMuseumDialogue(MuseumDialogue.CueType.SPECIES_RECEIVED, species);
         }
@@ -610,7 +611,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 setMuseumMode(true);
                 museumScanCooldown = 0;
                 museumSpeechCooldown = 80;
-                museumStatusCooldown = 1200;
+                museumStatusCooldown = 0;
                 museumStatusCue = null;
                 setOrderedToSit(false);
                 if (!player.getAbilities().instabuild) held.shrink(1);
@@ -619,8 +620,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 getNavigation().stop();
                 player.displayClientMessage(Component.literal(
                     "Blathers: " + MuseumDialogue.line(
-                        new MuseumDialogue.Cue(MuseumDialogue.CueType.NEEDS_SPECIMENS, ""),
-                        ((ServerLevel) level()).getServer().getResourceManager(), random.nextInt(10), 0)), false);
+                        new MuseumDialogue.Cue(MuseumDialogue.CueType.MODE_STARTED, ""),
+                        ((ServerLevel) level()).getServer().getResourceManager(), random.nextInt(12), 0)), false);
                 return InteractionResult.CONSUME;
             }
             if (isMuseumMode() && held.isEmpty() && player.isCrouching()) {

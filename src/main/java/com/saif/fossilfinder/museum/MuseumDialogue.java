@@ -14,6 +14,7 @@ import java.util.Locale;
 
 public final class MuseumDialogue {
     public enum CueType {
+        MODE_STARTED,
         SPECIES_RECEIVED,
         SPECIES_DISPLAYED,
         NEEDS_SPECIMENS,
@@ -54,6 +55,20 @@ public final class MuseumDialogue {
         "A tyrant lizard fossil! I am perfectly composed. That was a scholarly squeak, not a frightened one.",
         "Tyrannosaurus has joined the collection! I shall label it carefully, from a sensible distance.",
         "A mighty tyrant lizard! I do hope the frame is sturdy and that the fossil has eaten recently. Oh, it is extinct."
+    );
+    private static final List<String> MODE_STARTED_LINES = List.of(
+        "Museum Mode is open! I shall mind the fossils; you choose the frames.",
+        "Welcome to our little gallery. Let us give the ancient world a place on the wall.",
+        "Curator hat on, catalogue open! I am ready when you are.",
+        "The museum doors are metaphorically open. Please keep all fossils and puns inside.",
+        "A new exhibition begins! I promise not to rearrange the frames without a very good reason.",
+        "Museum Mode, splendid! I shall sort the specimens while you prepare our gallery.",
+        "At last, a museum! My feathers are tidy and my enthusiasm is only slightly untidy.",
+        "I am ready to curate. You bring the specimens and frames; I shall bring the commentary.",
+        "The past deserves a display. Let us make this gallery a place of wonder.",
+        "Museum duty begins! I have prepared a catalogue and several respectable opinions.",
+        "A fine day to put history on the wall. I am ready to help.",
+        "Welcome, assistant curator! I shall handle the bones with great care."
     );
     private static final List<String> DISPLAYED_LINES = List.of(
         "Into the frame it goes. Did you know? %s",
@@ -112,6 +127,7 @@ public final class MuseumDialogue {
 
     public static String line(Cue cue, ResourceManager resources, int variant, int factIndex) {
         return switch (cue.type()) {
+            case MODE_STARTED -> choose(MODE_STARTED_LINES, variant);
             case SPECIES_RECEIVED -> choose(cue.species().equals("tyrannosaurus")
                 ? TYRANNOSAURUS_LINES : RECEIVED_LINES, variant).formatted(displayName(cue.species()));
             case SPECIES_DISPLAYED -> {
