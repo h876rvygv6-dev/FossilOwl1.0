@@ -15,7 +15,7 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 5. Put that JAR in the instance `mods` folder alongside Forge, Fossils and Archaeology, and GeckoLib.
 
 ## In-game access
-- Creative inventory: spawn egg named **Fossil Finder Owl Spawn Egg**.
+- Creative inventory: spawn egg named **Blathers Spawn Egg**.
 - Command: `/summon fossil_finder_owl:fossil_finder_owl ~ ~ ~`
 - Tame: right-click with one of `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, or `fossil:fossil_tar`.
 - Assign tool: right-click the tamed owl with an iron pickaxe.
@@ -24,7 +24,8 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 
 ## Important reconstruction notes
 - The original JAR contains intermediary-mapped Fabric bytecode, not the original Java source. This project is a clean Forge-side reconstruction, not a byte-for-byte port.
-- The original 256x256 texture and Blockbench cube geometry have been carried over. The Blockbench model had 114 ungrouped cubes; its face-specific UV layout is approximated in the generated GeckoLib geo file, so visual inspection in-game is still required.
+- The owl now uses the supplied low-poly Blathers Collada model. `tools/convert_blathers.py` preserves its 21-joint rig, per-face UVs, and body/eye textures in a runtime mesh resource; the custom renderer skins the mesh and keeps attachment points for hats and held items. The source model and texture atlases are preserved under `models/entity/blathers/`. Regenerate the resource with `python tools/convert_blathers.py path/to/fossil_finder_owl_low_poly.zip`. Model scale and in-game appearance still need validation.
 - Fossils and Archaeology block and item IDs were checked against its supplied 9.3.4.0 JAR. The verified fossil blocks are `fossil:fossil_stone`, `fossil:fossil_deepslate`, `fossil:fossil_calcite`, `fossil:fossil_dripstone`, `fossil:fossil_sandstone`, `fossil:fossil_red_sandstone`, `fossil:fossil_tuff`, and `fossil:amber_ore`. Verified fossil gifts are `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, and `fossil:fossil_tar`. There is no registered `fossil:amber` item in the supplied JAR, so it is deliberately not used as a gift.
 - This first reconstruction includes biome spawning in forest/plains, a spawn egg, summonable entity, taming, stay/follow, 12-slot cargo, and basic fossil-block excavation. Structure-proximity spawning, robust pathfinding excavation, full configuration, dialogue scheduling, and a complete test pass remain follow-up work.
+- The imported eye texture is currently the model's authored `e.0.png`; the other supplied eye frames are retained as source assets but are not animated.
 - This environment had no Gradle installation and no network access to resolve ForgeGradle/Minecraft dependencies. Consequently, the source project could not be compiled or launched here. Do not treat this archive as a verified ready-to-install binary JAR until it has been built and tested in a Forge 1.20.1 development environment.
