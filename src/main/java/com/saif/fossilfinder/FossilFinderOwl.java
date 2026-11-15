@@ -1,14 +1,17 @@
 package com.saif.fossilfinder;
 
+import com.saif.fossilfinder.entity.FossilFinderOwlEntity;
 import com.saif.fossilfinder.registry.OwlEntities;
 import com.saif.fossilfinder.registry.OwlItems;
 import com.saif.fossilfinder.registry.OwlMenus;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
@@ -56,6 +59,17 @@ public class FossilFinderOwl {
             event.accept(OwlItems.T_REX_PLUSHIE_HAT);
             event.accept(OwlItems.DINO_BASEBALL_CAP);
             event.accept(OwlItems.DINO_TRUCKER_CAP);
+        }
+    }
+
+    @net.minecraftforge.eventbus.api.SubscribeEvent
+    public void onPlayerBreakBlock(BlockEvent.BreakEvent event) {
+        if (event.getPlayer().level().isClientSide) return;
+        var player = event.getPlayer();
+        AABB area = new AABB(event.getPos()).inflate(16.0);
+        for (FossilFinderOwlEntity owl :
+            player.level().getEntitiesOfClass(FossilFinderOwlEntity.class, area)) {
+            owl.reactToOwnerMining(player, event.getPos(), event.getState());
         }
     }
 }

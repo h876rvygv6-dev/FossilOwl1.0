@@ -47,7 +47,12 @@ public final class OwlHatInteraction {
 
         owl.setItemSlot(EquipmentSlot.HEAD, offered.copyWithCount(1));
         if (!player.getAbilities().instabuild) offered.shrink(1);
-        player.displayClientMessage(net.minecraft.network.chat.Component.literal("A new hat! I feel extra brave already!"), true);
+        if (owl.isMuseumMode()) {
+            player.displayClientMessage(
+                net.minecraft.network.chat.Component.literal("A new hat! I feel extra brave already!"), true);
+        } else {
+            owl.reactToHatGift();
+        }
         cancel(event, InteractionResult.CONSUME);
     }
 

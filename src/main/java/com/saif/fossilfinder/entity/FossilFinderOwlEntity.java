@@ -2,6 +2,7 @@ package com.saif.fossilfinder.entity;
 
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import com.saif.fossilfinder.item.OwlHatItem;
+import com.saif.fossilfinder.fieldwork.FieldworkDialogue;
 import com.saif.fossilfinder.museum.MuseumBoneClassifier;
 import com.saif.fossilfinder.museum.MuseumDialogue;
 import com.saif.fossilfinder.registry.OwlItems;
@@ -48,6 +49,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.network.NetworkHooks;
@@ -112,6 +114,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private final Set<String> museumFactSpecies = new HashSet<>();
     private final Map<String, Integer> museumFactCounts = new HashMap<>();
     private final Queue<MuseumDialogue.Cue> museumDialogueQueue = new ArrayDeque<>();
+    private final Queue<String> fieldworkDialogueQueue = new ArrayDeque<>();
     private BlockPos target;
     private int scanCooldown;
     private int digTicks;
@@ -120,6 +123,13 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private int museumSpeechCooldown;
     private int museumStatusCooldown;
     private MuseumDialogue.CueType museumStatusCue;
+    private int fieldworkSpeechCooldown;
+    private int fieldworkFollowTicks;
+    private int fieldworkMiningCount;
+    private int fieldworkMiningCommentCooldown;
+    private int fieldworkDiscoveryCooldown;
+    private int fieldworkQuietTicks;
+    private int fieldworkQuietCooldown;
 
     public FossilFinderOwlEntity(EntityType<FossilFinderOwlEntity> type, Level level) {
         super(type, level);
@@ -190,6 +200,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             setNoGravity(false);
             return;
         }
+        if (!isMuseumMode() && getOwner() instanceof Player owner) tickFieldworkDialogue(owner);
         if (isOrderedToSit()) {
             target = null;
             digTicks = 0;
@@ -213,7 +224,17 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return;
         }
         collectNearbyDrops();
+        if (!pickaxe.isEmpty() && target == null) {
+            if (++fieldworkQuietTicks >= 6000 && fieldworkQuietCooldown <= 0) {
+                queueFieldworkDialogue(FieldworkDialogue.Cue.QUIET_EXPEDITION);
+                fieldworkQuietTicks = 0;
+                fieldworkQuietCooldown = 6000;
+            }
+        } else {
+            fieldworkQuietTicks = 0;
+        }
         if (getOwner() instanceof Player owner && distanceToSqr(owner) > 64.0) {
+            recordFieldworkFollowing();
             target = null;
             digTicks = 0;
             if (distanceToSqr(owner) > 400.0) {
@@ -244,9 +265,16 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         }
         if (getOwner() instanceof Player owner) {
             double distance = distanceToSqr(owner);
-            if (distance > 30.0) getNavigation().moveTo(owner, 1.0);
-            else if (distance < 7.0) getNavigation().stop();
-            else if (getNavigation().isDone()) getNavigation().moveTo(owner, 0.9);
+            if (distance > 30.0) {
+                recordFieldworkFollowing();
+                getNavigation().moveTo(owner, 1.0);
+            } else if (distance < 7.0) {
+                fieldworkFollowTicks = 0;
+                getNavigation().stop();
+            } else if (getNavigation().isDone()) {
+                fieldworkFollowTicks = 0;
+                getNavigation().moveTo(owner, 0.9);
+            }
             if (distance > 400.0) {
                 teleportTo(owner.getX() + 1.0, owner.getY() + 1.0, owner.getZ() + 1.0);
                 getNavigation().stop();
@@ -390,6 +418,96 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         }
     }
 
+    private void tickFieldworkDialogue(Player owner) {
+        if (fieldworkSpeechCooldown > 0) fieldworkSpeechCooldown--;
+        if (fieldworkMiningCommentCooldown > 0) fieldworkMiningCommentCooldown--;
+        if (fieldworkDiscoveryCooldown > 0) fieldworkDiscoveryCooldown--;
+        if (fieldworkQuietCooldown > 0) fieldworkQuietCooldown--;
+        if (fieldworkSpeechCooldown > 0 || fieldworkDialogueQueue.isEmpty()) return;
+
+        owner.displayClientMessage(Component.literal("Blathers: " + fieldworkDialogueQueue.poll()), false);
+        fieldworkSpeechCooldown = 40;
+    }
+
+    private void queueFieldworkDialogue(FieldworkDialogue.Cue cue) {
+        if (isMuseumMode() || fieldworkDialogueQueue.size() >= 10) return;
+        String phrase = FieldworkDialogue.line(cue, random.nextInt(24));
+        for (String line : FieldworkDialogue.sentences(phrase)) {
+            if (fieldworkDialogueQueue.size() >= 10) break;
+            if (!fieldworkDialogueQueue.contains(line)) fieldworkDialogueQueue.add(line);
+        }
+    }
+
+    private void recordFieldworkFollowing() {
+        if (++fieldworkFollowTicks >= 2400) {
+            fieldworkFollowTicks = 0;
+            queueFieldworkDialogue(FieldworkDialogue.Cue.FOLLOWING);
+        }
+    }
+
+    public void reactToOwnerMining(Player player, BlockPos brokenPos, BlockState state) {
+        if (level().isClientSide || !isTame() || !isOwnedBy(player) || isMuseumMode()
+            || distanceToSqr(brokenPos.getX() + 0.5, brokenPos.getY() + 0.5, brokenPos.getZ() + 0.5) > 256.0) {
+            return;
+        }
+
+        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        if (id != null && (FOSSIL_BLOCKS.contains(id.toString())
+            || (id.getNamespace().equals("fossil")
+                && (id.getPath().contains("fossil") || id.getPath().contains("amber"))))) {
+            fieldworkMiningCount = 0;
+            if (fieldworkDiscoveryCooldown <= 0) {
+                queueFieldworkDialogue(FieldworkDialogue.Cue.OWNER_FOUND_FOSSIL);
+                fieldworkDiscoveryCooldown = 800;
+            }
+            return;
+        }
+
+        if (isCommonStone(state)) {
+            fieldworkMiningCount++;
+            if (fieldworkMiningCount >= 8 && fieldworkMiningCommentCooldown <= 0) {
+                queueFieldworkDialogue(FieldworkDialogue.Cue.MINING_COMMENT);
+                fieldworkMiningCount = 0;
+                fieldworkMiningCommentCooldown = 2400;
+            }
+        }
+    }
+
+    private boolean isCommonStone(BlockState state) {
+        return state.is(Blocks.STONE) || state.is(Blocks.DEEPSLATE)
+            || state.is(Blocks.GRANITE) || state.is(Blocks.DIORITE)
+            || state.is(Blocks.ANDESITE) || state.is(Blocks.TUFF);
+    }
+
+    public void reactToHatGift() {
+        if (isTame() && !isMuseumMode()) queueFieldworkDialogue(FieldworkDialogue.Cue.HAT_GIFT);
+    }
+
+    private void returnGift(Player player, ItemStack stack) {
+        if (!stack.isEmpty() && !player.getInventory().add(stack.copy())) player.drop(stack.copy(), false);
+    }
+
+    private void givePickaxe(Player player, ItemStack held) {
+        ItemStack previousPickaxe = pickaxe.copy();
+        setPickaxe(held.copyWithCount(1));
+        if (!player.getAbilities().instabuild) held.shrink(1);
+        returnGift(player, previousPickaxe);
+        target = null;
+        queueFieldworkDialogue(FieldworkDialogue.Cue.PICKAXE);
+    }
+
+    private void giveLight(Player player, ItemStack held) {
+        ItemStack previousLight = lightItem.copy();
+        setLightItem(held.copyWithCount(1));
+        if (!player.getAbilities().instabuild) held.shrink(1);
+        returnGift(player, previousLight);
+        if (isMuseumMode()) {
+            player.displayClientMessage(Component.literal("A light for the expedition! You do think of everything."), true);
+        } else {
+            queueFieldworkDialogue(FieldworkDialogue.Cue.LIGHT);
+        }
+    }
+
     private void enqueueMuseumDialogue(MuseumDialogue.CueType type, String species) {
         MuseumDialogue.Cue cue = new MuseumDialogue.Cue(type, species);
         if (!museumDialogueQueue.contains(cue)) museumDialogueQueue.add(cue);
@@ -469,7 +587,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     private void returnToOwner() {
         if (getOwner() instanceof Player owner) {
-            if (distanceToSqr(owner) > 16.0) getNavigation().moveTo(owner, 1.0);
+            if (distanceToSqr(owner) > 16.0) {
+                recordFieldworkFollowing();
+                getNavigation().moveTo(owner, 1.0);
+            }
             else getNavigation().stop();
         }
     }
@@ -506,6 +627,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (!remainder.isEmpty()) level().addFreshEntity(new ItemEntity(level(), minedPos.getX() + 0.5, minedPos.getY() + 0.5, minedPos.getZ() + 0.5, remainder));
         }
         level().removeBlock(minedPos, false);
+        if (fieldworkDiscoveryCooldown <= 0) {
+            queueFieldworkDialogue(FieldworkDialogue.Cue.OWL_FOUND_FOSSIL);
+            fieldworkDiscoveryCooldown = 800;
+        }
         triggerAnim("action", "dance");
         pickaxe.hurtAndBreak(1, this, entity -> setPickaxe(ItemStack.EMPTY));
         setPickaxe(pickaxe);
@@ -599,7 +724,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             tame(player);
             setOrderedToSit(false);
             level().broadcastEntityEvent(this, (byte) 7);
-            player.displayClientMessage(Component.literal("The owl accepts your fossil and joins your expedition!"), true);
+            queueFieldworkDialogue(FieldworkDialogue.Cue.TAMED);
             return InteractionResult.CONSUME;
         }
         if (isTame() && isOwnedBy(player)) {
@@ -611,6 +736,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 museumBook = held.copyWithCount(1);
                 museumBookConsumed = !player.getAbilities().instabuild;
                 setMuseumMode(true);
+                fieldworkDialogueQueue.clear();
+                fieldworkSpeechCooldown = 0;
                 museumScanCooldown = 0;
                 museumSpeechCooldown = 80;
                 museumStatusCooldown = 0;
@@ -632,8 +759,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             }
             if (isMuseumMode() && isPickaxe(held)) {
                 ItemStack newPickaxe = held.copyWithCount(1);
+                ItemStack previousPickaxe = pickaxe.copy();
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 setPickaxe(newPickaxe);
+                returnGift(player, previousPickaxe);
                 stopMuseumMode(player);
                 return InteractionResult.CONSUME;
             }
@@ -641,7 +770,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 heal(4.0F);
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 triggerAnim("action", "dance");
-                player.displayClientMessage(Component.literal("Your owl looks healthier."), true);
+                if (isMuseumMode()) {
+                    player.displayClientMessage(Component.literal("Your owl looks healthier."), true);
+                } else {
+                    queueFieldworkDialogue(FieldworkDialogue.Cue.HEALING);
+                }
                 return InteractionResult.CONSUME;
             }
             if (held.is(Items.BONE)) {
@@ -650,32 +783,35 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                         "Blathers: My wings are busy curating. I shall perch when the exhibits are ready."), false);
                     return InteractionResult.CONSUME;
                 }
-                if (!player.getAbilities().instabuild) held.shrink(1);
                 setOrderedToSit(!isOrderedToSit());
                 target = null;
                 digTicks = 0;
                 getNavigation().stop();
-                player.displayClientMessage(Component.literal(isOrderedToSit() ? "Your owl will perch here." : "Your owl will follow your expedition."), true);
+                fieldworkFollowTicks = 0;
+                if (!player.getAbilities().instabuild) held.shrink(1);
+                queueFieldworkDialogue(isOrderedToSit()
+                    ? FieldworkDialogue.Cue.STAY : FieldworkDialogue.Cue.FOLLOW);
                 return InteractionResult.CONSUME;
             }
             if (isRejectedPickaxe(held)) {
-                player.displayClientMessage(Component.literal("Umm... not quite the right durability. My fossil-finding beak needs a sturdier pick!"), true);
+                if (isMuseumMode()) {
+                    player.displayClientMessage(Component.literal(
+                        "Umm... not quite the right durability. My fossil-finding beak needs a sturdier pick!"), true);
+                } else {
+                    queueFieldworkDialogue(FieldworkDialogue.Cue.REJECTED_PICKAXE);
+                }
                 return InteractionResult.CONSUME;
             }
             if (isPickaxe(held)) {
-                setPickaxe(held.copyWithCount(1));
-                if (!player.getAbilities().instabuild) held.shrink(1);
-                target = null;
-                player.displayClientMessage(Component.literal("Your owl is ready for its fossil expedition!"), true);
+                givePickaxe(player, held);
                 return InteractionResult.CONSUME;
             }
             if (isLight(held)) {
-                setLightItem(held.copyWithCount(1));
-                if (!player.getAbilities().instabuild) held.shrink(1);
-                player.displayClientMessage(Component.literal("Your owl takes the light."), true);
+                giveLight(player, held);
                 return InteractionResult.CONSUME;
             }
             if (held.isEmpty()) {
+                if (!isMuseumMode()) queueFieldworkDialogue(FieldworkDialogue.Cue.CARGO);
                 openCargo(player);
                 return InteractionResult.SUCCESS;
             }
@@ -696,6 +832,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         }
         museumDialogueQueue.clear();
         museumStatusCue = null;
+        fieldworkFollowTicks = 0;
         target = null;
         digTicks = 0;
         getNavigation().stop();
@@ -704,7 +841,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         museumBook = ItemStack.EMPTY;
         if (!book.isEmpty() && museumBookConsumed && !player.getInventory().add(book)) player.drop(book, false);
         museumBookConsumed = false;
-        player.displayClientMessage(Component.literal("Museum Mode ended. Your Dinopedia has been returned."), true);
+        queueFieldworkDialogue(FieldworkDialogue.Cue.FIELDWORK_RETURNED);
     }
 
     @Override
@@ -748,6 +885,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!museumBook.isEmpty()) tag.put("MuseumBook", museumBook.save(new CompoundTag()));
         tag.putBoolean("MuseumBookConsumed", museumBookConsumed);
         saveMuseumDialogueData(tag);
+        saveFieldworkDialogueData(tag);
         if (target != null) tag.putLong("Target", target.asLong());
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) {
@@ -777,7 +915,38 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             && (!tag.contains("MuseumBookConsumed") || tag.getBoolean("MuseumBookConsumed"));
         setMuseumMode(tag.getBoolean("MuseumMode") && !museumBook.isEmpty());
         loadMuseumDialogueData(tag);
+        loadFieldworkDialogueData(tag);
         if (tag.contains("Target")) target = BlockPos.of(tag.getLong("Target"));
+    }
+
+    private void saveFieldworkDialogueData(CompoundTag tag) {
+        ListTag queuedDialogue = new ListTag();
+        for (String line : fieldworkDialogueQueue) {
+            queuedDialogue.add(net.minecraft.nbt.StringTag.valueOf(line));
+        }
+        tag.put("FieldworkDialogueQueue", queuedDialogue);
+        tag.putInt("FieldworkSpeechCooldown", fieldworkSpeechCooldown);
+        tag.putInt("FieldworkFollowTicks", fieldworkFollowTicks);
+        tag.putInt("FieldworkMiningCount", fieldworkMiningCount);
+        tag.putInt("FieldworkMiningCommentCooldown", fieldworkMiningCommentCooldown);
+        tag.putInt("FieldworkDiscoveryCooldown", fieldworkDiscoveryCooldown);
+        tag.putInt("FieldworkQuietTicks", fieldworkQuietTicks);
+        tag.putInt("FieldworkQuietCooldown", fieldworkQuietCooldown);
+    }
+
+    private void loadFieldworkDialogueData(CompoundTag tag) {
+        fieldworkDialogueQueue.clear();
+        ListTag queuedDialogue = tag.getList("FieldworkDialogueQueue", Tag.TAG_STRING);
+        for (int i = 0; i < queuedDialogue.size() && fieldworkDialogueQueue.size() < 10; i++) {
+            fieldworkDialogueQueue.add(queuedDialogue.getString(i));
+        }
+        fieldworkSpeechCooldown = tag.getInt("FieldworkSpeechCooldown");
+        fieldworkFollowTicks = tag.getInt("FieldworkFollowTicks");
+        fieldworkMiningCount = tag.getInt("FieldworkMiningCount");
+        fieldworkMiningCommentCooldown = tag.getInt("FieldworkMiningCommentCooldown");
+        fieldworkDiscoveryCooldown = tag.getInt("FieldworkDiscoveryCooldown");
+        fieldworkQuietTicks = tag.getInt("FieldworkQuietTicks");
+        fieldworkQuietCooldown = tag.getInt("FieldworkQuietCooldown");
     }
 
     private void saveMuseumDialogueData(CompoundTag tag) {
