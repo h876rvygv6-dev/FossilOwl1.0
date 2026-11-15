@@ -23,6 +23,7 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 - Assign tool: right-click the tamed owl with an iron pickaxe.
 - Stay/follow: right-click with a vanilla bone.
 - Collect its cargo: empty-hand right-click while close to open the fossil-themed screen with 15 cargo slots, hat and pickaxe slots, and a live owl preview. Cargo from older 27-slot saves is preserved and moved into the visible slots as space becomes available.
+- Museum Mode: craft a Dinopedia and right-click your tamed owl with it. Add F&A bone items to the owl's cargo and place empty item frames within eight blocks; the owl will fill them and group recognized species together. Crouch and interact empty-handed to retrieve the Dinopedia and resume fieldwork, or give the owl a pickaxe to return to fieldwork with that tool equipped.
 - Named owl easter eggs: use a name tag to name an owl **Blathers** or **Celeste** (case-insensitive) to apply that character's skin. Unnamed owls, including naturally spawning owls and spawn-egg owls, keep the default skin. Feeding a hurt owl or having it excavate ore triggers its dance.
 
 ## Important reconstruction notes

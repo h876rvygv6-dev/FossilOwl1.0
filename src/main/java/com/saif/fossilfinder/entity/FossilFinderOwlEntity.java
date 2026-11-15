@@ -2,6 +2,8 @@ package com.saif.fossilfinder.entity;
 
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import com.saif.fossilfinder.item.OwlHatItem;
+import com.saif.fossilfinder.museum.MuseumBoneClassifier;
+import com.saif.fossilfinder.registry.OwlItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -33,6 +35,7 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.SitWhenOrderedToGoal;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Monster;
@@ -72,6 +75,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     private static final EntityDataAccessor<ItemStack> DATA_PICKAXE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> DATA_LIGHT_ITEM = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<Boolean> DATA_MUSEUM_MODE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.BOOLEAN);
     private static final Set<String> FOSSIL_BLOCKS = Set.of(
         "fossil:fossil_stone", "fossil:fossil_deepslate", "fossil:fossil_calcite",
         "fossil:fossil_dripstone", "fossil:fossil_sandstone", "fossil:fossil_red_sandstone",
@@ -95,10 +99,12 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private final PickaxeContainer pickaxeContainer = new PickaxeContainer();
     private ItemStack pickaxe = ItemStack.EMPTY;
     private ItemStack lightItem = ItemStack.EMPTY;
+    private ItemStack museumBook = ItemStack.EMPTY;
     private BlockPos target;
     private int scanCooldown;
     private int digTicks;
     private int alarmCooldown;
+    private int museumScanCooldown;
 
     public FossilFinderOwlEntity(EntityType<FossilFinderOwlEntity> type, Level level) {
         super(type, level);
@@ -110,6 +116,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         super.defineSynchedData();
         entityData.define(DATA_PICKAXE, ItemStack.EMPTY);
         entityData.define(DATA_LIGHT_ITEM, ItemStack.EMPTY);
+        entityData.define(DATA_MUSEUM_MODE, false);
     }
 
     private void setPickaxe(ItemStack stack) {
@@ -125,6 +132,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     public ItemStack getPickaxeForRender() { return entityData.get(DATA_PICKAXE); }
     public ItemStack getLightForRender() { return entityData.get(DATA_LIGHT_ITEM); }
+    public boolean isMuseumMode() { return entityData.get(DATA_MUSEUM_MODE); }
+
+    private void setMuseumMode(boolean museumMode) {
+        entityData.set(DATA_MUSEUM_MODE, museumMode);
+    }
 
     public static AttributeSupplier.Builder createAttributes() {
         return TamableAnimal.createMobAttributes()
@@ -178,6 +190,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         setNoGravity(true);
         if (alarmCooldown > 0) alarmCooldown--;
         restorePendingCargo();
+        if (isMuseumMode()) {
+            if (getOwner() instanceof Player owner) tickMuseumMode(owner);
+            return;
+        }
         collectNearbyDrops();
         if (getOwner() instanceof Player owner && distanceToSqr(owner) > 64.0) {
             target = null;
@@ -218,6 +234,108 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 getNavigation().stop();
             }
         }
+    }
+
+    private void tickMuseumMode(Player owner) {
+        target = null;
+        digTicks = 0;
+        if (museumScanCooldown > 0) {
+            museumScanCooldown--;
+            return;
+        }
+        museumScanCooldown = 10;
+
+        double ownerDistance = distanceToSqr(owner);
+        if (ownerDistance > 64.0) {
+            if (ownerDistance > 400.0) {
+                teleportTo(owner.getX() + 1.0, owner.getY() + 1.0, owner.getZ() + 1.0);
+                getNavigation().stop();
+            } else if (getNavigation().isDone() || tickCount % 10 == 0) {
+                getNavigation().moveTo(owner, 1.0);
+            }
+            return;
+        }
+
+        int cargoSlot = findMuseumBoneSlot();
+        if (cargoSlot < 0) {
+            followOwner(owner);
+            return;
+        }
+
+        String species = museumSpecies(cargo.getItem(cargoSlot));
+        if (species == null) {
+            followOwner(owner);
+            return;
+        }
+
+        ItemFrame frame = findMuseumFrame(species);
+        if (frame == null) {
+            followOwner(owner);
+            return;
+        }
+        if (distanceToSqr(frame) > 4.0) {
+            if (getNavigation().isDone() || tickCount % 10 == 0) getNavigation().moveTo(frame, 0.9);
+            return;
+        }
+
+        getNavigation().stop();
+        if (!frame.isAlive() || !frame.getItem().isEmpty()) return;
+
+        ItemStack displayStack = cargo.getItem(cargoSlot).copyWithCount(1);
+        frame.setItem(displayStack, true);
+        if (ItemStack.isSameItemSameTags(frame.getItem(), displayStack)) {
+            cargo.removeItem(cargoSlot, 1);
+            museumScanCooldown = 20;
+            triggerAnim("action", "dance");
+            playHoot(false);
+        }
+    }
+
+    private int findMuseumBoneSlot() {
+        for (int slot = 0; slot < cargo.getContainerSize(); slot++) {
+            if (museumSpecies(cargo.getItem(slot)) != null) return slot;
+        }
+        return -1;
+    }
+
+    private String museumSpecies(ItemStack stack) {
+        if (stack.isEmpty()) return null;
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        return id == null ? null : MuseumBoneClassifier.speciesFor(id.getNamespace(), id.getPath()).orElse(null);
+    }
+
+    private ItemFrame findMuseumFrame(String species) {
+        var frames = level().getEntitiesOfClass(ItemFrame.class, getBoundingBox().inflate(8.0),
+            frame -> frame.isAlive() && !frame.isInvisible() && frame.distanceToSqr(this) <= 64.0);
+        var emptyFrames = frames.stream().filter(frame -> frame.getItem().isEmpty()).toList();
+        if (emptyFrames.isEmpty()) return null;
+
+        var matchingDisplays = frames.stream()
+            .filter(frame -> species.equals(museumSpecies(frame.getItem())))
+            .toList();
+        return emptyFrames.stream()
+            .min((first, second) -> {
+                int groupDistance = Double.compare(
+                    distanceToSpeciesDisplay(first, matchingDisplays),
+                    distanceToSpeciesDisplay(second, matchingDisplays));
+                if (groupDistance != 0) return groupDistance;
+                int owlDistance = Double.compare(first.distanceToSqr(this), second.distanceToSqr(this));
+                if (owlDistance != 0) return owlDistance;
+                return Long.compare(first.blockPosition().asLong(), second.blockPosition().asLong());
+            })
+            .orElse(null);
+    }
+
+    private double distanceToSpeciesDisplay(ItemFrame frame, java.util.List<ItemFrame> matchingDisplays) {
+        if (matchingDisplays.isEmpty()) return frame.distanceToSqr(this);
+        return matchingDisplays.stream().mapToDouble(frame::distanceToSqr).min().orElse(Double.MAX_VALUE);
+    }
+
+    private void followOwner(Player owner) {
+        double distance = distanceToSqr(owner);
+        if (distance > 30.0) getNavigation().moveTo(owner, 1.0);
+        else if (distance < 7.0) getNavigation().stop();
+        else if (getNavigation().isDone()) getNavigation().moveTo(owner, 0.9);
     }
 
     private Monster findNearbyHostile() {
@@ -408,6 +526,33 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return InteractionResult.CONSUME;
         }
         if (isTame() && isOwnedBy(player)) {
+            if (held.is(OwlItems.DINOPEDIA.get())) {
+                if (isMuseumMode()) {
+                    player.displayClientMessage(Component.literal("Your owl is already curating a museum."), true);
+                    return InteractionResult.CONSUME;
+                }
+                museumBook = held.copyWithCount(1);
+                setMuseumMode(true);
+                museumScanCooldown = 0;
+                if (!player.getAbilities().instabuild) held.shrink(1);
+                target = null;
+                digTicks = 0;
+                getNavigation().stop();
+                player.displayClientMessage(Component.literal(
+                    "Museum Mode started. Add fossil bones to the owl's cargo and place empty item frames nearby."), true);
+                return InteractionResult.CONSUME;
+            }
+            if (isMuseumMode() && held.isEmpty() && player.isCrouching()) {
+                stopMuseumMode(player);
+                return InteractionResult.CONSUME;
+            }
+            if (isMuseumMode() && isPickaxe(held)) {
+                ItemStack newPickaxe = held.copyWithCount(1);
+                if (!player.getAbilities().instabuild) held.shrink(1);
+                setPickaxe(newPickaxe);
+                stopMuseumMode(player);
+                return InteractionResult.CONSUME;
+            }
             if (isHealingFood(held) && getHealth() < getMaxHealth()) {
                 heal(4.0F);
                 if (!player.getAbilities().instabuild) held.shrink(1);
@@ -449,6 +594,29 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         return super.mobInteract(player, hand);
     }
 
+    public void stopMuseumMode(Player player) {
+        if (!isMuseumMode()) return;
+        setMuseumMode(false);
+        museumScanCooldown = 0;
+        target = null;
+        digTicks = 0;
+        getNavigation().stop();
+
+        ItemStack book = museumBook;
+        museumBook = ItemStack.EMPTY;
+        if (!book.isEmpty() && !player.getInventory().add(book)) player.drop(book, false);
+        player.displayClientMessage(Component.literal("Museum Mode ended. Your Dinopedia has been returned."), true);
+    }
+
+    @Override
+    protected void dropAllDeathLoot(DamageSource source) {
+        super.dropAllDeathLoot(source);
+        if (!museumBook.isEmpty()) {
+            spawnAtLocation(museumBook);
+            museumBook = ItemStack.EMPTY;
+        }
+    }
+
     private boolean isRejectedPickaxe(ItemStack stack) {
         return stack.is(Items.WOODEN_PICKAXE) || stack.is(Items.STONE_PICKAXE) || stack.is(Items.GOLDEN_PICKAXE);
     }
@@ -476,6 +644,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         tag.put("PendingCargo", ContainerHelper.saveAllItems(new CompoundTag(), pendingCargo));
         if (!pickaxe.isEmpty()) tag.put("Pickaxe", pickaxe.save(new CompoundTag()));
         if (!lightItem.isEmpty()) tag.put("LightItem", lightItem.save(new CompoundTag()));
+        tag.putBoolean("MuseumMode", isMuseumMode());
+        if (!museumBook.isEmpty()) tag.put("MuseumBook", museumBook.save(new CompoundTag()));
         if (target != null) tag.putLong("Target", target.asLong());
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) {
@@ -500,6 +670,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         cargo.setChanged();
         setPickaxe(tag.contains("Pickaxe") ? ItemStack.of(tag.getCompound("Pickaxe")) : ItemStack.EMPTY);
         setLightItem(tag.contains("LightItem") ? ItemStack.of(tag.getCompound("LightItem")) : ItemStack.EMPTY);
+        museumBook = tag.contains("MuseumBook") ? ItemStack.of(tag.getCompound("MuseumBook")) : ItemStack.EMPTY;
+        setMuseumMode(tag.getBoolean("MuseumMode") && !museumBook.isEmpty());
         if (tag.contains("Target")) target = BlockPos.of(tag.getLong("Target"));
     }
 

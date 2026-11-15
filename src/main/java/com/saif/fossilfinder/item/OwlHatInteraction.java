@@ -23,6 +23,13 @@ public final class OwlHatInteraction {
         if (player.level().isClientSide) return;
         ItemStack wornHat = owl.getItemBySlot(EquipmentSlot.HEAD);
 
+        if (owl.isTame() && owl.isOwnedBy(player) && owl.isMuseumMode()
+            && player.isCrouching() && event.getItemStack().isEmpty()) {
+            owl.stopMuseumMode(player);
+            cancel(event, InteractionResult.CONSUME);
+            return;
+        }
+
         if (player.isCrouching() && event.getItemStack().isEmpty() && wornHat.getItem() instanceof OwlHatItem) {
             owl.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
             if (!player.getInventory().add(wornHat.copy())) player.drop(wornHat.copy(), false);
