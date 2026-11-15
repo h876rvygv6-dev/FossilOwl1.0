@@ -18,6 +18,13 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
     private static final int HAT_SLOT = CARGO_SLOTS;
     private static final int TOOL_SLOT = HAT_SLOT + 1;
     private static final int PLAYER_INVENTORY_START = TOOL_SLOT + 1;
+    private static final int CARGO_SLOT_X = 118;
+    private static final int CARGO_SLOT_Y = 26;
+    private static final int CARGO_SLOT_SPACING = 22;
+    private static final int PLAYER_SLOT_X = 12;
+    private static final int PLAYER_INVENTORY_Y = 110;
+    private static final int PLAYER_SLOT_SPACING = 24;
+    private static final int HOTBAR_Y = 182;
     private final int owlEntityId;
 
     public OwlInventoryMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buffer) {
@@ -32,11 +39,12 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 5; col++) {
-                addSlot(new Slot(cargo, row * 5 + col, 73 + col * 17, 13 + row * 17));
+                addSlot(new Slot(cargo, row * 5 + col, CARGO_SLOT_X + col * CARGO_SLOT_SPACING,
+                    CARGO_SLOT_Y + row * CARGO_SLOT_SPACING));
             }
         }
 
-        addSlot(new Slot(hat, 0, 5, 13) {
+        addSlot(new Slot(hat, 0, 12, 16) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.getItem() instanceof OwlHatItem;
@@ -48,7 +56,7 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
             }
         });
 
-        addSlot(new Slot(tool, 0, 5, 30) {
+        addSlot(new Slot(tool, 0, 12, 49) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return FossilFinderOwlEntity.isPickaxe(stack);
@@ -62,12 +70,14 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(playerInventory, col + row * 9 + 9, 5 + col * 17, 74 + row * 17));
+                addSlot(new Slot(playerInventory, col + row * 9 + 9,
+                    PLAYER_SLOT_X + col * PLAYER_SLOT_SPACING,
+                    PLAYER_INVENTORY_Y + row * PLAYER_SLOT_SPACING));
             }
         }
 
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(playerInventory, col, 5 + col * 17, 126));
+            addSlot(new Slot(playerInventory, col, PLAYER_SLOT_X + col * PLAYER_SLOT_SPACING, HOTBAR_Y));
         }
     }
 

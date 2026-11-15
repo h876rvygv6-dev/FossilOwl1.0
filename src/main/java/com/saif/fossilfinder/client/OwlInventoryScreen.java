@@ -10,27 +10,31 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 
 public class OwlInventoryScreen extends AbstractContainerScreen<OwlInventoryMenu> {
+    private static final int TEXTURE_WIDTH = 1400;
+    private static final int TEXTURE_HEIGHT = 1293;
+    private static final int TEXTURE_SCALE = 6;
     private static final ResourceLocation TEXTURE = new ResourceLocation(
-        "fossil_finder_owl", "textures/gui/owl_inventory.png");
+        "fossil_finder_owl", "textures/gui/fossil_finder_owl_gui_texture.png");
 
     public OwlInventoryScreen(OwlInventoryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
-        imageWidth = 162;
-        imageHeight = 152;
+        imageWidth = (TEXTURE_WIDTH + TEXTURE_SCALE - 1) / TEXTURE_SCALE;
+        imageHeight = (TEXTURE_HEIGHT + TEXTURE_SCALE - 1) / TEXTURE_SCALE;
     }
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        graphics.blit(TEXTURE, leftPos, topPos, 0, 0, imageWidth, imageHeight);
+        graphics.blit(TEXTURE, leftPos, topPos, imageWidth, imageHeight, 0, 0,
+            TEXTURE_WIDTH, TEXTURE_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
         if (minecraft.level != null
             && minecraft.level.getEntity(menu.getOwlEntityId()) instanceof FossilFinderOwlEntity owl) {
-            int previewX = leftPos + 47;
-            int previewY = topPos + 37;
+            int previewX = leftPos + 94;
+            int previewY = topPos + 105;
             owl.setInventoryPreviewRendering(true);
             try {
                 InventoryScreen.renderEntityInInventoryFollowsMouse(
-                    graphics, previewX, previewY, 28, previewX - mouseX, previewY - mouseY, owl);
+                    graphics, previewX, previewY, 30, previewX - mouseX, previewY - mouseY, owl);
             } finally {
                 owl.setInventoryPreviewRendering(false);
             }
