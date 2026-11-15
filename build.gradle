@@ -45,7 +45,11 @@ test {
 
 processResources {
     inputs.property 'version', project.version
+    inputs.dir 'libs/Dinopedia'
     filesMatching('META-INF/mods.toml') { expand 'version': project.version }
+    from('libs/Dinopedia') {
+        into 'assets/fossil_finder_owl/dinopedia'
+    }
 }
 
 jar {

@@ -15,13 +15,14 @@ This is an in-progress source update based on the user's uploaded Forge 2.1.0 pr
 - Replaced the prior animation set with the supplied standing, sitting, moving, flying, and dance motions. Adapted Blockbench variable expressions to GeckoLib Molang; idle uses the standing pose, and a short dance plays after feeding a hurt owl or excavating ore.
 - Replaced the placeholder cargo panel with a fossil-textured GUI, 15 visible cargo slots, functional hat and pickaxe slots, player inventory/hotbar, and an owl preview. The hat slot reads and writes the owl's normal head equipment slot. Cargo saved in the previous 27-slot layout is retained and queued into the new slots as capacity opens.
 - Added Museum Mode, activated with a crafted Dinopedia. The owl pauses excavation, reads recognized species-specific F&A bone items from its existing cargo, and places one item into each nearby empty item frame, prioritizing frames adjacent to the same species. Museum state and the stored Dinopedia persist; crouch-empty interaction or giving a pickaxe returns the book and resumes fieldwork.
+- Added randomized, context-aware curator dialogue for new species, frame placement, missing specimens, missing frames, and inaccessible displays. The first displayed bone for each species is followed by a fact loaded from that species' `libs/Dinopedia/*.txt` file; Gradle packages all 64 source entries as mod assets. Pending dialogue and species discovery state persist across saves.
 
 ## Not complete / not verified
 - This is **not a compiled or game-tested JAR**. The execution environment did not have Gradle installed and could not reach the Gradle distribution host, so a ForgeGradle build could not be run here.
 - Torch/lantern attachment rendering and dynamic world lighting are not implemented. The entity currently accepts and saves the item, and explicitly tells the player this is visual/light functionality pending.
 - The active owl model's animation and attachment positions still need in-game testing.
 - Fossil mining, pickup, and the new cargo GUI still need in-game validation. Ore drops use the owner as the loot-context entity and enter a shared, persisted 15-slot cargo container; overflow from previous 27-slot saves is preserved.
-- Museum Mode's item-ID classifier has focused tests, but item-frame navigation and the complete set of F&A bone registry IDs still need in-game validation against the exact runtime mod JAR.
+- Museum Mode's item-ID classifier and dialogue formatting have focused tests, but item-frame navigation and the complete set of F&A bone registry IDs still need in-game validation against the exact runtime mod JAR.
 - Existing saves should be backed up before testing any development build.
 
 ## Build

@@ -3,6 +3,7 @@ package com.saif.fossilfinder.entity;
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import com.saif.fossilfinder.item.OwlHatItem;
 import com.saif.fossilfinder.museum.MuseumBoneClassifier;
+import com.saif.fossilfinder.museum.MuseumDialogue;
 import com.saif.fossilfinder.registry.OwlItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
@@ -58,6 +59,12 @@ import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 /** Server-authoritative fossil-finding companion. */
@@ -100,11 +107,18 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private ItemStack pickaxe = ItemStack.EMPTY;
     private ItemStack lightItem = ItemStack.EMPTY;
     private ItemStack museumBook = ItemStack.EMPTY;
+    private final Set<String> museumDiscoveredSpecies = new HashSet<>();
+    private final Set<String> museumFactSpecies = new HashSet<>();
+    private final Map<String, Integer> museumFactCounts = new HashMap<>();
+    private final Queue<MuseumDialogue.Cue> museumDialogueQueue = new ArrayDeque<>();
     private BlockPos target;
     private int scanCooldown;
     private int digTicks;
     private int alarmCooldown;
     private int museumScanCooldown;
+    private int museumSpeechCooldown;
+    private int museumStatusCooldown;
+    private MuseumDialogue.CueType museumStatusCue;
 
     public FossilFinderOwlEntity(EntityType<FossilFinderOwlEntity> type, Level level) {
         super(type, level);
@@ -191,7 +205,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (alarmCooldown > 0) alarmCooldown--;
         restorePendingCargo();
         if (isMuseumMode()) {
-            if (getOwner() instanceof Player owner) tickMuseumMode(owner);
+            if (getOwner() instanceof Player owner) {
+                tickMuseumDialogue(owner);
+                tickMuseumMode(owner);
+            }
             return;
         }
         collectNearbyDrops();
@@ -239,6 +256,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private void tickMuseumMode(Player owner) {
         target = null;
         digTicks = 0;
+        if (museumStatusCooldown > 0) museumStatusCooldown--;
         if (museumScanCooldown > 0) {
             museumScanCooldown--;
             return;
@@ -258,6 +276,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
         int cargoSlot = findMuseumBoneSlot();
         if (cargoSlot < 0) {
+            reportMuseumStatus(MuseumDialogue.CueType.NEEDS_SPECIMENS);
             followOwner(owner);
             return;
         }
@@ -267,17 +286,29 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             followOwner(owner);
             return;
         }
+        if (museumDiscoveredSpecies.add(species)) {
+            enqueueMuseumDialogue(MuseumDialogue.CueType.SPECIES_RECEIVED, species);
+        }
 
         ItemFrame frame = findMuseumFrame(species);
         if (frame == null) {
+            reportMuseumStatus(MuseumDialogue.CueType.NEEDS_FRAMES);
             followOwner(owner);
             return;
         }
         if (distanceToSqr(frame) > 4.0) {
-            if (getNavigation().isDone() || tickCount % 10 == 0) getNavigation().moveTo(frame, 0.9);
+            if (getNavigation().isDone() || tickCount % 10 == 0) {
+                boolean pathFound = getNavigation().moveTo(frame, 0.9);
+                if (!pathFound) {
+                    reportMuseumStatus(MuseumDialogue.CueType.FRAME_UNREACHABLE);
+                } else {
+                    clearMuseumStatus();
+                }
+            }
             return;
         }
 
+        clearMuseumStatus();
         getNavigation().stop();
         if (!frame.isAlive() || !frame.getItem().isEmpty()) return;
 
@@ -285,6 +316,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         frame.setItem(displayStack, true);
         if (ItemStack.isSameItemSameTags(frame.getItem(), displayStack)) {
             cargo.removeItem(cargoSlot, 1);
+            if (museumFactSpecies.add(species)) {
+                museumFactCounts.putIfAbsent(species, 0);
+                enqueueMuseumDialogue(MuseumDialogue.CueType.SPECIES_DISPLAYED, species);
+            }
             museumScanCooldown = 20;
             triggerAnim("action", "dance");
             playHoot(false);
@@ -326,7 +361,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             .orElse(null);
     }
 
-    private double distanceToSpeciesDisplay(ItemFrame frame, java.util.List<ItemFrame> matchingDisplays) {
+    private double distanceToSpeciesDisplay(ItemFrame frame, List<ItemFrame> matchingDisplays) {
         if (matchingDisplays.isEmpty()) return frame.distanceToSqr(this);
         return matchingDisplays.stream().mapToDouble(frame::distanceToSqr).min().orElse(Double.MAX_VALUE);
     }
@@ -336,6 +371,46 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (distance > 30.0) getNavigation().moveTo(owner, 1.0);
         else if (distance < 7.0) getNavigation().stop();
         else if (getNavigation().isDone()) getNavigation().moveTo(owner, 0.9);
+    }
+
+    private void tickMuseumDialogue(Player owner) {
+        if (museumSpeechCooldown > 0) museumSpeechCooldown--;
+        if (museumSpeechCooldown > 0 || museumDialogueQueue.isEmpty()) return;
+
+        MuseumDialogue.Cue cue = museumDialogueQueue.poll();
+        int factIndex = museumFactCounts.getOrDefault(cue.species(), 0);
+        String line = MuseumDialogue.line(
+            cue, ((ServerLevel) level()).getServer().getResourceManager(), random.nextInt(24), factIndex);
+        owner.displayClientMessage(Component.literal("Blathers: " + line), false);
+        museumSpeechCooldown = 80;
+        if (cue.type() == MuseumDialogue.CueType.SPECIES_DISPLAYED) {
+            museumFactCounts.put(cue.species(), factIndex + 1);
+        }
+    }
+
+    private void enqueueMuseumDialogue(MuseumDialogue.CueType type, String species) {
+        MuseumDialogue.Cue cue = new MuseumDialogue.Cue(type, species);
+        if (!museumDialogueQueue.contains(cue)) museumDialogueQueue.add(cue);
+    }
+
+    private void reportMuseumStatus(MuseumDialogue.CueType type) {
+        if (museumStatusCue != type) {
+            museumStatusCue = type;
+            museumStatusCooldown = 0;
+            museumDialogueQueue.removeIf(cue -> cue.type() != MuseumDialogue.CueType.SPECIES_RECEIVED
+                && cue.type() != MuseumDialogue.CueType.SPECIES_DISPLAYED);
+        }
+        if (museumStatusCooldown <= 0) {
+            enqueueMuseumDialogue(type, "");
+            museumStatusCooldown = 1200;
+        }
+    }
+
+    private void clearMuseumStatus() {
+        museumStatusCue = null;
+        museumStatusCooldown = 0;
+        museumDialogueQueue.removeIf(cue -> cue.type() != MuseumDialogue.CueType.SPECIES_RECEIVED
+            && cue.type() != MuseumDialogue.CueType.SPECIES_DISPLAYED);
     }
 
     private Monster findNearbyHostile() {
@@ -534,12 +609,18 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 museumBook = held.copyWithCount(1);
                 setMuseumMode(true);
                 museumScanCooldown = 0;
+                museumSpeechCooldown = 80;
+                museumStatusCooldown = 1200;
+                museumStatusCue = null;
+                setOrderedToSit(false);
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 target = null;
                 digTicks = 0;
                 getNavigation().stop();
                 player.displayClientMessage(Component.literal(
-                    "Museum Mode started. Add fossil bones to the owl's cargo and place empty item frames nearby."), true);
+                    "Blathers: " + MuseumDialogue.line(
+                        new MuseumDialogue.Cue(MuseumDialogue.CueType.NEEDS_SPECIMENS, ""),
+                        ((ServerLevel) level()).getServer().getResourceManager(), random.nextInt(10), 0)), false);
                 return InteractionResult.CONSUME;
             }
             if (isMuseumMode() && held.isEmpty() && player.isCrouching()) {
@@ -561,6 +642,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 return InteractionResult.CONSUME;
             }
             if (held.is(Items.BONE)) {
+                if (isMuseumMode()) {
+                    player.displayClientMessage(Component.literal(
+                        "Blathers: My wings are busy curating. I shall perch when the exhibits are ready."), false);
+                    return InteractionResult.CONSUME;
+                }
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 setOrderedToSit(!isOrderedToSit());
                 target = null;
@@ -598,6 +684,15 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!isMuseumMode()) return;
         setMuseumMode(false);
         museumScanCooldown = 0;
+        for (MuseumDialogue.Cue cue : museumDialogueQueue) {
+            if (cue.type() == MuseumDialogue.CueType.SPECIES_RECEIVED) {
+                museumDiscoveredSpecies.remove(cue.species());
+            } else if (cue.type() == MuseumDialogue.CueType.SPECIES_DISPLAYED) {
+                museumFactSpecies.remove(cue.species());
+            }
+        }
+        museumDialogueQueue.clear();
+        museumStatusCue = null;
         target = null;
         digTicks = 0;
         getNavigation().stop();
@@ -646,6 +741,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!lightItem.isEmpty()) tag.put("LightItem", lightItem.save(new CompoundTag()));
         tag.putBoolean("MuseumMode", isMuseumMode());
         if (!museumBook.isEmpty()) tag.put("MuseumBook", museumBook.save(new CompoundTag()));
+        saveMuseumDialogueData(tag);
         if (target != null) tag.putLong("Target", target.asLong());
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) {
@@ -672,7 +768,72 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         setLightItem(tag.contains("LightItem") ? ItemStack.of(tag.getCompound("LightItem")) : ItemStack.EMPTY);
         museumBook = tag.contains("MuseumBook") ? ItemStack.of(tag.getCompound("MuseumBook")) : ItemStack.EMPTY;
         setMuseumMode(tag.getBoolean("MuseumMode") && !museumBook.isEmpty());
+        loadMuseumDialogueData(tag);
         if (tag.contains("Target")) target = BlockPos.of(tag.getLong("Target"));
+    }
+
+    private void saveMuseumDialogueData(CompoundTag tag) {
+        ListTag discovered = new ListTag();
+        for (String species : museumDiscoveredSpecies) discovered.add(net.minecraft.nbt.StringTag.valueOf(species));
+        tag.put("MuseumDiscoveredSpecies", discovered);
+
+        ListTag facts = new ListTag();
+        for (String species : museumFactSpecies) facts.add(net.minecraft.nbt.StringTag.valueOf(species));
+        tag.put("MuseumFactSpecies", facts);
+
+        CompoundTag factCounts = new CompoundTag();
+        museumFactCounts.forEach(factCounts::putInt);
+        tag.put("MuseumFactCounts", factCounts);
+
+        ListTag queuedDialogue = new ListTag();
+        for (MuseumDialogue.Cue cue : museumDialogueQueue) {
+            CompoundTag entry = new CompoundTag();
+            entry.putString("Type", cue.type().name());
+            entry.putString("Species", cue.species());
+            queuedDialogue.add(entry);
+        }
+        tag.put("MuseumDialogueQueue", queuedDialogue);
+        tag.putInt("MuseumSpeechCooldown", museumSpeechCooldown);
+        tag.putInt("MuseumStatusCooldown", museumStatusCooldown);
+        if (museumStatusCue != null) tag.putString("MuseumStatusCue", museumStatusCue.name());
+    }
+
+    private void loadMuseumDialogueData(CompoundTag tag) {
+        museumDiscoveredSpecies.clear();
+        ListTag discovered = tag.getList("MuseumDiscoveredSpecies", Tag.TAG_STRING);
+        for (int i = 0; i < discovered.size(); i++) museumDiscoveredSpecies.add(discovered.getString(i));
+
+        museumFactSpecies.clear();
+        ListTag facts = tag.getList("MuseumFactSpecies", Tag.TAG_STRING);
+        for (int i = 0; i < facts.size(); i++) museumFactSpecies.add(facts.getString(i));
+
+        museumFactCounts.clear();
+        CompoundTag factCounts = tag.getCompound("MuseumFactCounts");
+        for (String species : factCounts.getAllKeys()) museumFactCounts.put(species, factCounts.getInt(species));
+
+        museumDialogueQueue.clear();
+        ListTag queuedDialogue = tag.getList("MuseumDialogueQueue", Tag.TAG_COMPOUND);
+        for (int i = 0; i < queuedDialogue.size(); i++) {
+            CompoundTag entry = queuedDialogue.getCompound(i);
+            try {
+                museumDialogueQueue.add(new MuseumDialogue.Cue(
+                    MuseumDialogue.CueType.valueOf(entry.getString("Type")), entry.getString("Species")));
+            } catch (IllegalArgumentException exception) {
+                System.getLogger(getClass().getName()).log(
+                    System.Logger.Level.WARNING, "Ignoring invalid saved Museum Mode dialogue cue", exception);
+            }
+        }
+        museumSpeechCooldown = tag.getInt("MuseumSpeechCooldown");
+        museumStatusCooldown = tag.getInt("MuseumStatusCooldown");
+        museumStatusCue = null;
+        if (tag.contains("MuseumStatusCue")) {
+            try {
+                museumStatusCue = MuseumDialogue.CueType.valueOf(tag.getString("MuseumStatusCue"));
+            } catch (IllegalArgumentException exception) {
+                System.getLogger(getClass().getName()).log(
+                    System.Logger.Level.WARNING, "Ignoring invalid saved Museum Mode status", exception);
+            }
+        }
     }
 
     @Override public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
