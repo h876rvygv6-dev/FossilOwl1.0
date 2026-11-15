@@ -1,25 +1,38 @@
 package com.saif.fossilfinder.client;
 
+import com.saif.fossilfinder.entity.FossilFinderOwlEntity;
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 
 public class OwlInventoryScreen extends AbstractContainerScreen<OwlInventoryMenu> {
+    private static final ResourceLocation TEXTURE = new ResourceLocation(
+        "fossil_finder_owl", "textures/gui/owl_inventory.png");
+
     public OwlInventoryScreen(OwlInventoryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
-        imageHeight = 168;
-        inventoryLabelY = 74;
+        imageWidth = 162;
+        imageHeight = 152;
     }
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        int left = leftPos;
-        int top = topPos;
-        graphics.fill(left, top, left + imageWidth, top + imageHeight, 0xFF202020);
-        graphics.fill(left + 1, top + 1, left + imageWidth - 1, top + imageHeight - 1, 0xFFC6C6C6);
-        graphics.fill(left + 3, top + 3, left + imageWidth - 3, top + 73, 0xFF8B8B8B);
-        graphics.fill(left + 4, top + 4, left + imageWidth - 4, top + 72, 0xFFC6C6C6);
+        graphics.blit(TEXTURE, leftPos, topPos, 0, 0, imageWidth, imageHeight);
+
+        if (minecraft.level != null
+            && minecraft.level.getEntity(menu.getOwlEntityId()) instanceof FossilFinderOwlEntity owl) {
+            int previewX = leftPos + 47;
+            int previewY = topPos + 37;
+            InventoryScreen.renderEntityInInventoryFollowsMouse(
+                graphics, previewX, previewY, 28, previewX - mouseX, previewY - mouseY, owl);
+        }
+    }
+
+    @Override
+    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
     }
 }

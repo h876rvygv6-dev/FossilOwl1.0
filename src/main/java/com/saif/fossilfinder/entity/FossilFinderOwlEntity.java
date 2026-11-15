@@ -4,6 +4,8 @@ import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -70,9 +72,12 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         "minecraft:porkchop", "minecraft:cooked_porkchop", "minecraft:mutton", "minecraft:cooked_mutton",
         "minecraft:chicken", "minecraft:cooked_chicken", "minecraft:rabbit", "minecraft:cooked_rabbit");
     private static final ResourceLocation HOOT_ID = new ResourceLocation("fossil_finder_owl", "fossil_owl_hoot");
+    private static final int CARGO_SIZE = 15;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
-    private final SimpleContainer cargo = new SimpleContainer(27);
+    private final SimpleContainer cargo = new SimpleContainer(CARGO_SIZE);
+    private NonNullList<ItemStack> pendingCargo = NonNullList.withSize(12, ItemStack.EMPTY);
+    private final PickaxeContainer pickaxeContainer = new PickaxeContainer();
     private ItemStack pickaxe = ItemStack.EMPTY;
     private ItemStack lightItem = ItemStack.EMPTY;
     private BlockPos target;
@@ -94,8 +99,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     private void setPickaxe(ItemStack stack) {
-        pickaxe = stack.copy();
+        pickaxe = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
         entityData.set(DATA_PICKAXE, pickaxe.copy());
+        pickaxeContainer.setFromEntity(pickaxe);
     }
 
     private void setLightItem(ItemStack stack) {
@@ -159,6 +165,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         }
         setNoGravity(true);
         if (alarmCooldown > 0) alarmCooldown--;
+        restorePendingCargo();
         collectNearbyDrops();
         if (getOwner() instanceof Player owner && distanceToSqr(owner) > 64.0) {
             target = null;
@@ -344,10 +351,41 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         return true;
     }
 
+    private void restorePendingCargo() {
+        for (int i = 0; i < pendingCargo.size(); i++) {
+            ItemStack stack = pendingCargo.get(i);
+            if (stack.isEmpty()) continue;
+            ItemStack remaining = addCargo(stack);
+            if (remaining.getCount() != stack.getCount()) pendingCargo.set(i, remaining);
+        }
+    }
+
+    private void addPendingCargo(ItemStack stack) {
+        if (stack.isEmpty()) return;
+        ItemStack remaining = stack.copy();
+        for (int i = 0; i < pendingCargo.size() && !remaining.isEmpty(); i++) {
+            ItemStack slot = pendingCargo.get(i);
+            if (!slot.isEmpty() && ItemStack.isSameItemSameTags(slot, remaining) && slot.getCount() < slot.getMaxStackSize()) {
+                int moved = Math.min(remaining.getCount(), slot.getMaxStackSize() - slot.getCount());
+                slot.grow(moved);
+                remaining.shrink(moved);
+            }
+        }
+        for (int i = 0; i < pendingCargo.size() && !remaining.isEmpty(); i++) {
+            if (pendingCargo.get(i).isEmpty()) {
+                int moved = Math.min(remaining.getCount(), remaining.getMaxStackSize());
+                pendingCargo.set(i, remaining.copyWithCount(moved));
+                remaining.shrink(moved);
+            }
+        }
+        if (!remaining.isEmpty()) pendingCargo.add(remaining);
+    }
+
     private void openCargo(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
             serverPlayer.openMenu(new SimpleMenuProvider((id, playerInventory, viewer) ->
-                new OwlInventoryMenu(id, playerInventory, cargo), Component.literal("Owl Cargo")));
+                new OwlInventoryMenu(id, playerInventory, cargo, pickaxeContainer, getId()),
+                Component.literal("Fossil Finder Owl")), buffer -> buffer.writeVarInt(getId()));
         }
     }
 
@@ -408,7 +446,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         return stack.is(Items.WOODEN_PICKAXE) || stack.is(Items.STONE_PICKAXE) || stack.is(Items.GOLDEN_PICKAXE);
     }
 
-    private boolean isPickaxe(ItemStack stack) {
+    public static boolean isPickaxe(ItemStack stack) {
         return stack.is(Items.IRON_PICKAXE) || stack.is(Items.DIAMOND_PICKAXE) || stack.is(Items.NETHERITE_PICKAXE);
     }
     private boolean isHealingFood(ItemStack stack) {
@@ -428,16 +466,29 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         NonNullList<ItemStack> cargoItems = NonNullList.withSize(cargo.getContainerSize(), ItemStack.EMPTY);
         for (int i = 0; i < cargo.getContainerSize(); i++) cargoItems.set(i, cargo.getItem(i).copy());
         tag.put("Cargo", ContainerHelper.saveAllItems(new CompoundTag(), cargoItems));
+        tag.put("PendingCargo", ContainerHelper.saveAllItems(new CompoundTag(), pendingCargo));
         if (!pickaxe.isEmpty()) tag.put("Pickaxe", pickaxe.save(new CompoundTag()));
         if (!lightItem.isEmpty()) tag.put("LightItem", lightItem.save(new CompoundTag()));
         if (target != null) tag.putLong("Target", target.asLong());
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
+        pendingCargo = NonNullList.withSize(12, ItemStack.EMPTY);
+        if (tag.contains("PendingCargo")) {
+            CompoundTag pendingTag = tag.getCompound("PendingCargo");
+            ListTag items = pendingTag.getList("Items", Tag.TAG_COMPOUND);
+            int pendingSize = 12;
+            for (int i = 0; i < items.size(); i++) {
+                pendingSize = Math.max(pendingSize, (items.getCompound(i).getByte("Slot") & 0xFF) + 1);
+            }
+            pendingCargo = NonNullList.withSize(pendingSize, ItemStack.EMPTY);
+            ContainerHelper.loadAllItems(pendingTag, pendingCargo);
+        }
         if (tag.contains("Cargo")) {
-            NonNullList<ItemStack> cargoItems = NonNullList.withSize(cargo.getContainerSize(), ItemStack.EMPTY);
+            NonNullList<ItemStack> cargoItems = NonNullList.withSize(27, ItemStack.EMPTY);
             ContainerHelper.loadAllItems(tag.getCompound("Cargo"), cargoItems);
             for (int i = 0; i < cargo.getContainerSize(); i++) cargo.setItem(i, cargoItems.get(i));
+            for (int i = cargo.getContainerSize(); i < cargoItems.size(); i++) addPendingCargo(cargoItems.get(i));
         }
         cargo.setChanged();
         setPickaxe(tag.contains("Pickaxe") ? ItemStack.of(tag.getCompound("Pickaxe")) : ItemStack.EMPTY);
@@ -456,4 +507,44 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     @Override public AnimatableInstanceCache getAnimatableInstanceCache() { return cache; }
     @Override public net.minecraft.world.entity.AgeableMob getBreedOffspring(ServerLevel level, net.minecraft.world.entity.AgeableMob mate) { return null; }
     @Override public boolean isFood(ItemStack stack) { return false; }
+
+    private final class PickaxeContainer extends SimpleContainer {
+        private boolean updatingFromEntity;
+
+        private PickaxeContainer() {
+            super(1);
+        }
+
+        private void setFromEntity(ItemStack stack) {
+            updatingFromEntity = true;
+            super.setItem(0, stack.copy());
+            updatingFromEntity = false;
+        }
+
+        @Override public boolean canPlaceItem(int slot, ItemStack stack) {
+            return slot == 0 && isPickaxe(stack);
+        }
+
+        @Override public void setItem(int slot, ItemStack stack) {
+            super.setItem(slot, stack);
+            if (slot == 0 && !updatingFromEntity) setPickaxe(super.getItem(0));
+        }
+
+        @Override public ItemStack removeItem(int slot, int amount) {
+            ItemStack removed = super.removeItem(slot, amount);
+            if (slot == 0) setPickaxe(super.getItem(0));
+            return removed;
+        }
+
+        @Override public ItemStack removeItemNoUpdate(int slot) {
+            ItemStack removed = super.removeItemNoUpdate(slot);
+            if (slot == 0) setPickaxe(super.getItem(0));
+            return removed;
+        }
+
+        @Override public void clearContent() {
+            super.clearContent();
+            setPickaxe(ItemStack.EMPTY);
+        }
+    }
 }

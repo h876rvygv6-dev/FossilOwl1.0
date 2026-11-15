@@ -22,11 +22,11 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 - Tame: right-click with one of `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, or `fossil:fossil_tar`.
 - Assign tool: right-click the tamed owl with an iron pickaxe.
 - Stay/follow: right-click with a vanilla bone.
-- Collect its cargo: empty-hand right-click while close to open the owl's 27-slot cargo screen.
+- Collect its cargo: empty-hand right-click while close to open the fossil-themed screen with 15 cargo slots, a pickaxe slot, and a live owl preview. Cargo from older 27-slot saves is preserved and moved into the visible slots as space becomes available.
 
 ## Important reconstruction notes
 - The original JAR contains intermediary-mapped Fabric bytecode, not the original Java source. This project is a clean Forge-side reconstruction, not a byte-for-byte port.
 - The active owl renderer uses the stable block geometry in `geo/owl.geo.json` with GeckoLib animations and head/hand attachment points. The imported Blathers Collada mesh and converter are retained as source assets, but are not rendered because its custom skinned appearance was badly distorted in-game.
 - Fossils and Archaeology block and item IDs were checked against its supplied 9.3.4.0 JAR. The verified fossil blocks are `fossil:fossil_stone`, `fossil:fossil_deepslate`, `fossil:fossil_calcite`, `fossil:fossil_dripstone`, `fossil:fossil_sandstone`, `fossil:fossil_red_sandstone`, `fossil:fossil_tuff`, and `fossil:amber_ore`. Verified fossil gifts are `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, and `fossil:fossil_tar`. There is no registered `fossil:amber` item in the supplied JAR, so it is deliberately not used as a gift.
-- This reconstruction includes biome spawning in forest/plains, a spawn egg, summonable entity, taming, stay/follow, a 27-slot cargo inventory, and basic fossil-block excavation. An owl now abandons its fossil target to follow its owner when they move more than eight blocks away; mining, loot collection, and movement still need in-game validation.
+- This reconstruction includes biome spawning in forest/plains, a spawn egg, summonable entity, taming, stay/follow, a 15-slot cargo inventory, and basic fossil-block excavation. An owl now abandons its fossil target to follow its owner when they move more than eight blocks away; mining, loot collection, and movement still need in-game validation.
 - GitHub Actions successfully compiles the source with Gradle, but that build does not verify the in-game model appearance, mining, pickup, or pathfinding. Test the generated JAR in a Forge 1.20.1 instance before treating those behaviors as game-verified.

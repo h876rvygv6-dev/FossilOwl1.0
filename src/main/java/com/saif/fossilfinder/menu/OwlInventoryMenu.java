@@ -1,5 +1,7 @@
 package com.saif.fossilfinder.menu;
 
+import com.saif.fossilfinder.entity.FossilFinderOwlEntity;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -11,30 +13,45 @@ import net.minecraft.world.item.ItemStack;
 import static com.saif.fossilfinder.registry.OwlMenus.OWL_INVENTORY;
 
 public class OwlInventoryMenu extends AbstractContainerMenu {
-    private final Container cargo;
+    private static final int CARGO_SLOTS = 15;
+    private static final int TOOL_SLOT = CARGO_SLOTS;
+    private static final int PLAYER_INVENTORY_START = TOOL_SLOT + 1;
+    private final int owlEntityId;
 
-    public OwlInventoryMenu(int containerId, Inventory playerInventory) {
-        this(containerId, playerInventory, new SimpleContainer(27));
+    public OwlInventoryMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buffer) {
+        this(containerId, playerInventory, new SimpleContainer(CARGO_SLOTS), new SimpleContainer(1), buffer.readVarInt());
     }
 
-    public OwlInventoryMenu(int containerId, Inventory playerInventory, Container cargo) {
+    public OwlInventoryMenu(int containerId, Inventory playerInventory, Container cargo, Container tool, int owlEntityId) {
         super(OWL_INVENTORY.get(), containerId);
-        this.cargo = cargo;
+        this.owlEntityId = owlEntityId;
 
         for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(cargo, row * 9 + col, 8 + col * 18, 18 + row * 18));
+            for (int col = 0; col < 5; col++) {
+                addSlot(new Slot(cargo, row * 5 + col, 73 + col * 17, 13 + row * 17));
             }
         }
 
+        addSlot(new Slot(tool, 0, 5, 30) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return FossilFinderOwlEntity.isPickaxe(stack);
+            }
+
+            @Override
+            public int getMaxStackSize() {
+                return 1;
+            }
+        });
+
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, 86 + row * 18));
+                addSlot(new Slot(playerInventory, col + row * 9 + 9, 5 + col * 17, 74 + row * 17));
             }
         }
 
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(playerInventory, col, 8 + col * 18, 144));
+            addSlot(new Slot(playerInventory, col, 5 + col * 17, 126));
         }
     }
 
@@ -46,15 +63,22 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
         if (slot != null && slot.hasItem()) {
             ItemStack stack = slot.getItem();
             carried = stack.copy();
+            boolean moved;
 
-            if (index < 27) {
-                if (!this.moveItemStackTo(stack, 27, this.slots.size(), true)) {
-                    return ItemStack.EMPTY;
+            if (index < CARGO_SLOTS || index == TOOL_SLOT) {
+                moved = this.moveItemStackTo(stack, PLAYER_INVENTORY_START, this.slots.size(), true);
+            } else {
+                moved = false;
+                Slot toolSlot = this.slots.get(TOOL_SLOT);
+                if (FossilFinderOwlEntity.isPickaxe(stack) && !toolSlot.hasItem()) {
+                    moved = this.moveItemStackTo(stack, TOOL_SLOT, TOOL_SLOT + 1, false);
                 }
-            } else if (!this.moveItemStackTo(stack, 0, 27, false)) {
-                return ItemStack.EMPTY;
+                if (!stack.isEmpty()) {
+                    moved |= this.moveItemStackTo(stack, 0, CARGO_SLOTS, false);
+                }
             }
 
+            if (!moved) return ItemStack.EMPTY;
             if (stack.isEmpty()) {
                 slot.setByPlayer(ItemStack.EMPTY);
             } else {
@@ -67,10 +91,15 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return true;
+        if (player.level().isClientSide) return true;
+        var entity = player.level().getEntity(owlEntityId);
+        return entity instanceof FossilFinderOwlEntity owl
+            && owl.isAlive()
+            && owl.isOwnedBy(player)
+            && owl.distanceToSqr(player) <= 64.0;
     }
 
-    public Container getCargo() {
-        return cargo;
+    public int getOwlEntityId() {
+        return owlEntityId;
     }
 }
