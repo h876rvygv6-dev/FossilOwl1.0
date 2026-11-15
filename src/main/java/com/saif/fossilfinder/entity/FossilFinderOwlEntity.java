@@ -107,6 +107,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private ItemStack pickaxe = ItemStack.EMPTY;
     private ItemStack lightItem = ItemStack.EMPTY;
     private ItemStack museumBook = ItemStack.EMPTY;
+    private boolean museumBookConsumed;
     private final Set<String> museumDiscoveredSpecies = new HashSet<>();
     private final Set<String> museumFactSpecies = new HashSet<>();
     private final Map<String, Integer> museumFactCounts = new HashMap<>();
@@ -608,6 +609,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                     return InteractionResult.CONSUME;
                 }
                 museumBook = held.copyWithCount(1);
+                museumBookConsumed = !player.getAbilities().instabuild;
                 setMuseumMode(true);
                 museumScanCooldown = 0;
                 museumSpeechCooldown = 80;
@@ -700,7 +702,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
         ItemStack book = museumBook;
         museumBook = ItemStack.EMPTY;
-        if (!book.isEmpty() && !player.getInventory().add(book)) player.drop(book, false);
+        if (!book.isEmpty() && museumBookConsumed && !player.getInventory().add(book)) player.drop(book, false);
+        museumBookConsumed = false;
         player.displayClientMessage(Component.literal("Museum Mode ended. Your Dinopedia has been returned."), true);
     }
 
@@ -708,8 +711,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     protected void dropAllDeathLoot(DamageSource source) {
         super.dropAllDeathLoot(source);
         if (!museumBook.isEmpty()) {
-            spawnAtLocation(museumBook);
+            if (museumBookConsumed) spawnAtLocation(museumBook);
             museumBook = ItemStack.EMPTY;
+            museumBookConsumed = false;
         }
     }
 
@@ -742,6 +746,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!lightItem.isEmpty()) tag.put("LightItem", lightItem.save(new CompoundTag()));
         tag.putBoolean("MuseumMode", isMuseumMode());
         if (!museumBook.isEmpty()) tag.put("MuseumBook", museumBook.save(new CompoundTag()));
+        tag.putBoolean("MuseumBookConsumed", museumBookConsumed);
         saveMuseumDialogueData(tag);
         if (target != null) tag.putLong("Target", target.asLong());
     }
@@ -768,6 +773,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         setPickaxe(tag.contains("Pickaxe") ? ItemStack.of(tag.getCompound("Pickaxe")) : ItemStack.EMPTY);
         setLightItem(tag.contains("LightItem") ? ItemStack.of(tag.getCompound("LightItem")) : ItemStack.EMPTY);
         museumBook = tag.contains("MuseumBook") ? ItemStack.of(tag.getCompound("MuseumBook")) : ItemStack.EMPTY;
+        museumBookConsumed = !museumBook.isEmpty()
+            && (!tag.contains("MuseumBookConsumed") || tag.getBoolean("MuseumBookConsumed"));
         setMuseumMode(tag.getBoolean("MuseumMode") && !museumBook.isEmpty());
         loadMuseumDialogueData(tag);
         if (tag.contains("Target")) target = BlockPos.of(tag.getLong("Target"));
