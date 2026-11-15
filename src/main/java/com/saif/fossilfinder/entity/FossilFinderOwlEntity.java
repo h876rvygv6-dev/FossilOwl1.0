@@ -2,6 +2,7 @@ package com.saif.fossilfinder.entity;
 
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -336,7 +337,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     private boolean cargoFull() {
-        return cargo.getItems().stream().allMatch(stack -> !stack.isEmpty() && stack.getCount() >= stack.getMaxStackSize());
+        for (int i = 0; i < cargo.getContainerSize(); i++) {
+            ItemStack stack = cargo.getItem(i);
+            if (stack.isEmpty() || stack.getCount() < stack.getMaxStackSize()) return false;
+        }
+        return true;
     }
 
     private void openCargo(Player player) {
@@ -420,14 +425,20 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     @Override public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.put("Cargo", ContainerHelper.saveAllItems(new CompoundTag(), cargo.getItems()));
+        NonNullList<ItemStack> cargoItems = NonNullList.withSize(cargo.getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < cargo.getContainerSize(); i++) cargoItems.set(i, cargo.getItem(i).copy());
+        tag.put("Cargo", ContainerHelper.saveAllItems(new CompoundTag(), cargoItems));
         if (!pickaxe.isEmpty()) tag.put("Pickaxe", pickaxe.save(new CompoundTag()));
         if (!lightItem.isEmpty()) tag.put("LightItem", lightItem.save(new CompoundTag()));
         if (target != null) tag.putLong("Target", target.asLong());
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.contains("Cargo")) ContainerHelper.loadAllItems(tag.getCompound("Cargo"), cargo.getItems());
+        if (tag.contains("Cargo")) {
+            NonNullList<ItemStack> cargoItems = NonNullList.withSize(cargo.getContainerSize(), ItemStack.EMPTY);
+            ContainerHelper.loadAllItems(tag.getCompound("Cargo"), cargoItems);
+            for (int i = 0; i < cargo.getContainerSize(); i++) cargo.setItem(i, cargoItems.get(i));
+        }
         cargo.setChanged();
         setPickaxe(tag.contains("Pickaxe") ? ItemStack.of(tag.getCompound("Pickaxe")) : ItemStack.EMPTY);
         setLightItem(tag.contains("LightItem") ? ItemStack.of(tag.getCompound("LightItem")) : ItemStack.EMPTY);
