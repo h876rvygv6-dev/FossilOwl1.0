@@ -1,6 +1,7 @@
 package com.saif.fossilfinder.entity;
 
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
+import com.saif.fossilfinder.item.OwlHatItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -22,6 +23,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -78,6 +80,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     private final SimpleContainer cargo = new SimpleContainer(CARGO_SIZE);
     private NonNullList<ItemStack> pendingCargo = NonNullList.withSize(12, ItemStack.EMPTY);
+    private final HatContainer hatContainer = new HatContainer();
     private final PickaxeContainer pickaxeContainer = new PickaxeContainer();
     private ItemStack pickaxe = ItemStack.EMPTY;
     private ItemStack lightItem = ItemStack.EMPTY;
@@ -385,7 +388,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private void openCargo(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
             NetworkHooks.openScreen(serverPlayer, new SimpleMenuProvider((id, playerInventory, viewer) ->
-                new OwlInventoryMenu(id, playerInventory, cargo, pickaxeContainer, getId()),
+                new OwlInventoryMenu(id, playerInventory, cargo, hatContainer, pickaxeContainer, getId()),
                 Component.literal("Fossil Finder Owl")), buffer -> buffer.writeVarInt(getId()));
         }
     }
@@ -508,6 +511,52 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     @Override public AnimatableInstanceCache getAnimatableInstanceCache() { return cache; }
     @Override public net.minecraft.world.entity.AgeableMob getBreedOffspring(ServerLevel level, net.minecraft.world.entity.AgeableMob mate) { return null; }
     @Override public boolean isFood(ItemStack stack) { return false; }
+
+    private final class HatContainer extends SimpleContainer {
+        private HatContainer() {
+            super(1);
+        }
+
+        @Override public boolean isEmpty() {
+            return getItem(0).isEmpty();
+        }
+
+        @Override public ItemStack getItem(int slot) {
+            return slot == 0 ? getItemBySlot(EquipmentSlot.HEAD) : ItemStack.EMPTY;
+        }
+
+        @Override public boolean canPlaceItem(int slot, ItemStack stack) {
+            return slot == 0 && stack.getItem() instanceof OwlHatItem;
+        }
+
+        @Override public void setItem(int slot, ItemStack stack) {
+            if (slot != 0 || (!stack.isEmpty() && !canPlaceItem(slot, stack))) return;
+            setItemSlot(EquipmentSlot.HEAD, stack.copy());
+        }
+
+        @Override public ItemStack removeItem(int slot, int amount) {
+            if (slot != 0 || amount <= 0) return ItemStack.EMPTY;
+            ItemStack current = getItem(slot);
+            if (current.isEmpty()) return ItemStack.EMPTY;
+
+            ItemStack removed = current.copyWithCount(Math.min(amount, current.getCount()));
+            ItemStack remaining = current.copy();
+            remaining.shrink(removed.getCount());
+            setItem(slot, remaining);
+            return removed;
+        }
+
+        @Override public ItemStack removeItemNoUpdate(int slot) {
+            if (slot != 0) return ItemStack.EMPTY;
+            ItemStack removed = getItem(slot).copy();
+            setItem(slot, ItemStack.EMPTY);
+            return removed;
+        }
+
+        @Override public void clearContent() {
+            setItem(0, ItemStack.EMPTY);
+        }
+    }
 
     private final class PickaxeContainer extends SimpleContainer {
         private boolean updatingFromEntity;

@@ -16,13 +16,13 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 
 ## In-game access
 - Creative inventory: spawn egg named **Blathers Spawn Egg**.
-- Creative inventory: all six 2D hat sprites are in the Combat tab. Equip one in the player's helmet slot or use it on an owned Blathers; crouch and interact empty-handed to retrieve the owl's hat.
+- Creative inventory: all six 2D hat sprites are in the Combat tab. Equip one in the player's helmet slot or use it on an owned Blathers. The owl's cargo screen has a hat slot for equipping, swapping, or retrieving hats; crouch and interact empty-handed still retrieves the hat directly.
 - Hat recipes use leather, string, wool, and Fossils and Archaeology items. Hats are durable, grant +6 maximum health (+10 for the dinosaur plushie hats), and do not provide armor protection.
 - Command: `/summon fossil_finder_owl:fossil_finder_owl ~ ~ ~`
 - Tame: right-click with one of `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, or `fossil:fossil_tar`.
 - Assign tool: right-click the tamed owl with an iron pickaxe.
 - Stay/follow: right-click with a vanilla bone.
-- Collect its cargo: empty-hand right-click while close to open the fossil-themed screen with 15 cargo slots, a pickaxe slot, and a live owl preview. Cargo from older 27-slot saves is preserved and moved into the visible slots as space becomes available.
+- Collect its cargo: empty-hand right-click while close to open the fossil-themed screen with 15 cargo slots, hat and pickaxe slots, and a live owl preview. Cargo from older 27-slot saves is preserved and moved into the visible slots as space becomes available.
 
 ## Important reconstruction notes
 - The original JAR contains intermediary-mapped Fabric bytecode, not the original Java source. This project is a clean Forge-side reconstruction, not a byte-for-byte port.

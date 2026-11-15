@@ -1,6 +1,7 @@
 package com.saif.fossilfinder.menu;
 
 import com.saif.fossilfinder.entity.FossilFinderOwlEntity;
+import com.saif.fossilfinder.item.OwlHatItem;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -14,15 +15,18 @@ import static com.saif.fossilfinder.registry.OwlMenus.OWL_INVENTORY;
 
 public class OwlInventoryMenu extends AbstractContainerMenu {
     private static final int CARGO_SLOTS = 15;
-    private static final int TOOL_SLOT = CARGO_SLOTS;
+    private static final int HAT_SLOT = CARGO_SLOTS;
+    private static final int TOOL_SLOT = HAT_SLOT + 1;
     private static final int PLAYER_INVENTORY_START = TOOL_SLOT + 1;
     private final int owlEntityId;
 
     public OwlInventoryMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buffer) {
-        this(containerId, playerInventory, new SimpleContainer(CARGO_SLOTS), new SimpleContainer(1), buffer.readVarInt());
+        this(containerId, playerInventory, new SimpleContainer(CARGO_SLOTS), new SimpleContainer(1),
+            new SimpleContainer(1), buffer.readVarInt());
     }
 
-    public OwlInventoryMenu(int containerId, Inventory playerInventory, Container cargo, Container tool, int owlEntityId) {
+    public OwlInventoryMenu(int containerId, Inventory playerInventory, Container cargo, Container hat,
+                            Container tool, int owlEntityId) {
         super(OWL_INVENTORY.get(), containerId);
         this.owlEntityId = owlEntityId;
 
@@ -31,6 +35,18 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
                 addSlot(new Slot(cargo, row * 5 + col, 73 + col * 17, 13 + row * 17));
             }
         }
+
+        addSlot(new Slot(hat, 0, 5, 13) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return stack.getItem() instanceof OwlHatItem;
+            }
+
+            @Override
+            public int getMaxStackSize() {
+                return 1;
+            }
+        });
 
         addSlot(new Slot(tool, 0, 5, 30) {
             @Override
@@ -65,12 +81,16 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
             carried = stack.copy();
             boolean moved;
 
-            if (index < CARGO_SLOTS || index == TOOL_SLOT) {
+            if (index < CARGO_SLOTS || index == HAT_SLOT || index == TOOL_SLOT) {
                 moved = this.moveItemStackTo(stack, PLAYER_INVENTORY_START, this.slots.size(), true);
             } else {
                 moved = false;
+                Slot hatSlot = this.slots.get(HAT_SLOT);
                 Slot toolSlot = this.slots.get(TOOL_SLOT);
-                if (FossilFinderOwlEntity.isPickaxe(stack) && !toolSlot.hasItem()) {
+                if (stack.getItem() instanceof OwlHatItem && !hatSlot.hasItem()) {
+                    moved = this.moveItemStackTo(stack, HAT_SLOT, HAT_SLOT + 1, false);
+                }
+                if (!stack.isEmpty() && FossilFinderOwlEntity.isPickaxe(stack) && !toolSlot.hasItem()) {
                     moved = this.moveItemStackTo(stack, TOOL_SLOT, TOOL_SLOT + 1, false);
                 }
                 if (!stack.isEmpty()) {

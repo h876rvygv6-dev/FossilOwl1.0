@@ -12,7 +12,7 @@ This is an in-progress source update based on the user's uploaded Forge 2.1.0 pr
 - Corrected the fossil block registry IDs to the names used by the supplied Fossils and Archaeology Revival 9.3.4.0 JAR (`fossil_stone`, `fossil_deepslate`, etc.).
 - Registered the existing owl hoot audio through `sounds.json` and moved the OGG into the expected `sounds/` folder.
 - Added the supplied low-poly Blathers Collada assets, but switched the active renderer back to the stable block geometry in `geo/owl.geo.json` after the skinned mesh rendered badly in-game. The existing head and hand attachments remain available on the active model.
-- Replaced the placeholder cargo panel with a fossil-textured GUI, 15 visible cargo slots, a functional pickaxe slot, player inventory/hotbar, and an owl preview. Cargo saved in the previous 27-slot layout is retained and queued into the new slots as capacity opens.
+- Replaced the placeholder cargo panel with a fossil-textured GUI, 15 visible cargo slots, functional hat and pickaxe slots, player inventory/hotbar, and an owl preview. The hat slot reads and writes the owl's normal head equipment slot. Cargo saved in the previous 27-slot layout is retained and queued into the new slots as capacity opens.
 
 ## Not complete / not verified
 - This is **not a compiled or game-tested JAR**. The execution environment did not have Gradle installed and could not reach the Gradle distribution host, so a ForgeGradle build could not be run here.
