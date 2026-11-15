@@ -46,6 +46,9 @@ public class FossilFinderOwl {
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(OwlItems.SPAWN_EGG);
         }
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            event.accept(OwlItems.DINOPEDIA);
+        }
         if (event.getTabKey() == CreativeModeTabs.COMBAT) {
             event.accept(OwlItems.PALEO_COWBOY_HAT);
             event.accept(OwlItems.PALEONTOLOGIST_EXPLORER_HAT);

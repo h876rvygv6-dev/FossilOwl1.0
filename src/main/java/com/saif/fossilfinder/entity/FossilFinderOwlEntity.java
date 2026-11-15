@@ -1,7 +1,10 @@
 package com.saif.fossilfinder.entity;
 
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
+import com.saif.fossilfinder.museum.MuseumState;
+import com.saif.fossilfinder.museum.OwlMode;
 import com.saif.fossilfinder.item.OwlHatItem;
+import com.saif.fossilfinder.item.DinopediaItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -72,6 +75,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     private static final EntityDataAccessor<ItemStack> DATA_PICKAXE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> DATA_LIGHT_ITEM = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<Integer> DATA_OWL_MODE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_MUSEUM_STATE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.INT);
     private static final Set<String> FOSSIL_BLOCKS = Set.of(
         "fossil:fossil_stone", "fossil:fossil_deepslate", "fossil:fossil_calcite",
         "fossil:fossil_dripstone", "fossil:fossil_sandstone", "fossil:fossil_red_sandstone",
@@ -93,6 +98,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private NonNullList<ItemStack> pendingCargo = NonNullList.withSize(12, ItemStack.EMPTY);
     private final HatContainer hatContainer = new HatContainer();
     private final PickaxeContainer pickaxeContainer = new PickaxeContainer();
+    private ItemStack museumDinopedia = ItemStack.EMPTY;
     private ItemStack pickaxe = ItemStack.EMPTY;
     private ItemStack lightItem = ItemStack.EMPTY;
     private BlockPos target;
@@ -110,6 +116,28 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         super.defineSynchedData();
         entityData.define(DATA_PICKAXE, ItemStack.EMPTY);
         entityData.define(DATA_LIGHT_ITEM, ItemStack.EMPTY);
+        entityData.define(DATA_OWL_MODE, OwlMode.FIELD_WORK.ordinal());
+        entityData.define(DATA_MUSEUM_STATE, MuseumState.UNASSIGNED.ordinal());
+    }
+
+    public OwlMode getOwlMode() {
+        return enumValue(OwlMode.values(), entityData.get(DATA_OWL_MODE), OwlMode.FIELD_WORK);
+    }
+
+    public MuseumState getMuseumState() {
+        return enumValue(MuseumState.values(), entityData.get(DATA_MUSEUM_STATE), MuseumState.UNASSIGNED);
+    }
+
+    private static <T> T enumValue(T[] values, int index, T fallback) {
+        return index >= 0 && index < values.length ? values[index] : fallback;
+    }
+
+    private void setOwlMode(OwlMode mode) {
+        entityData.set(DATA_OWL_MODE, mode.ordinal());
+    }
+
+    private void setMuseumState(MuseumState state) {
+        entityData.set(DATA_MUSEUM_STATE, state.ordinal());
     }
 
     private void setPickaxe(ItemStack stack) {
@@ -175,8 +203,15 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             handleThreat(threat);
             return;
         }
-        setNoGravity(true);
         if (alarmCooldown > 0) alarmCooldown--;
+        if (getOwlMode() == OwlMode.MUSEUM) {
+            target = null;
+            digTicks = 0;
+            setNoGravity(true);
+            followOwner();
+            return;
+        }
+        setNoGravity(true);
         restorePendingCargo();
         collectNearbyDrops();
         if (getOwner() instanceof Player owner && distanceToSqr(owner) > 64.0) {
@@ -276,6 +311,19 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (getOwner() instanceof Player owner) {
             if (distanceToSqr(owner) > 16.0) getNavigation().moveTo(owner, 1.0);
             else getNavigation().stop();
+        }
+    }
+
+    private void followOwner() {
+        if (!(getOwner() instanceof Player owner)) return;
+        double distance = distanceToSqr(owner);
+        if (distance > 400.0) {
+            teleportTo(owner.getX() + 1.0, owner.getY() + 1.0, owner.getZ() + 1.0);
+            getNavigation().stop();
+        } else if (distance > 64.0 || (distance > 30.0 && getNavigation().isDone())) {
+            getNavigation().moveTo(owner, 1.0);
+        } else if (distance < 7.0) {
+            getNavigation().stop();
         }
     }
 
@@ -408,6 +456,23 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return InteractionResult.CONSUME;
         }
         if (isTame() && isOwnedBy(player)) {
+            if (getOwlMode() == OwlMode.MUSEUM) {
+                if (held.is(Items.IRON_PICKAXE)) {
+                    leaveMuseumMode(player, held);
+                    return InteractionResult.CONSUME;
+                }
+                if (player.isCrouching() && held.isEmpty()) {
+                    leaveMuseumMode(player, ItemStack.EMPTY);
+                    return InteractionResult.CONSUME;
+                }
+                if (held.isEmpty()) {
+                    openCargo(player);
+                    return InteractionResult.SUCCESS;
+                }
+            } else if (held.getItem() instanceof DinopediaItem) {
+                enterMuseumMode(player, held);
+                return InteractionResult.CONSUME;
+            }
             if (isHealingFood(held) && getHealth() < getMaxHealth()) {
                 heal(4.0F);
                 if (!player.getAbilities().instabuild) held.shrink(1);
@@ -449,6 +514,52 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         return super.mobInteract(player, hand);
     }
 
+    private void enterMuseumMode(Player player, ItemStack offeredDinopedia) {
+        if (getOwlMode() != OwlMode.FIELD_WORK || !museumDinopedia.isEmpty()) return;
+
+        museumDinopedia = offeredDinopedia.copyWithCount(1);
+        if (!player.getAbilities().instabuild) offeredDinopedia.shrink(1);
+        target = null;
+        digTicks = 0;
+        getNavigation().stop();
+        setOwlMode(OwlMode.MUSEUM);
+        setMuseumState(MuseumState.UNASSIGNED);
+        triggerAnim("action", "dance");
+        player.displayClientMessage(Component.literal(
+            "The owl is ready to curate a museum. It will wait for a Museum Workbench."), true);
+    }
+
+    private void leaveMuseumMode(Player player, ItemStack offeredPickaxe) {
+        ItemStack oldPickaxe = ItemStack.EMPTY;
+        if (!offeredPickaxe.isEmpty()) {
+            oldPickaxe = pickaxe.copy();
+            setPickaxe(offeredPickaxe.copyWithCount(1));
+            if (!player.getAbilities().instabuild) offeredPickaxe.shrink(1);
+        }
+
+        ItemStack returnedDinopedia = museumDinopedia;
+        museumDinopedia = ItemStack.EMPTY;
+        setOwlMode(OwlMode.FIELD_WORK);
+        setMuseumState(MuseumState.UNASSIGNED);
+        target = null;
+        digTicks = 0;
+        getNavigation().stop();
+
+        giveOrDrop(player, returnedDinopedia);
+        giveOrDrop(player, oldPickaxe);
+        triggerAnim("action", "dance");
+        player.displayClientMessage(Component.literal(
+            "The owl is excited to return to field work!"), true);
+    }
+
+    private static void giveOrDrop(Player player, ItemStack stack) {
+        if (stack.isEmpty()) return;
+        ItemStack returned = stack.copy();
+        if (!player.getInventory().add(returned)) {
+            player.drop(returned, false);
+        }
+    }
+
     private boolean isRejectedPickaxe(ItemStack stack) {
         return stack.is(Items.WOODEN_PICKAXE) || stack.is(Items.STONE_PICKAXE) || stack.is(Items.GOLDEN_PICKAXE);
     }
@@ -477,6 +588,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!pickaxe.isEmpty()) tag.put("Pickaxe", pickaxe.save(new CompoundTag()));
         if (!lightItem.isEmpty()) tag.put("LightItem", lightItem.save(new CompoundTag()));
         if (target != null) tag.putLong("Target", target.asLong());
+        tag.putString("OwlMode", getOwlMode().name());
+        tag.putString("MuseumState", getMuseumState().name());
+        if (!museumDinopedia.isEmpty()) tag.put("MuseumDinopedia", museumDinopedia.save(new CompoundTag()));
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
@@ -501,6 +615,18 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         setPickaxe(tag.contains("Pickaxe") ? ItemStack.of(tag.getCompound("Pickaxe")) : ItemStack.EMPTY);
         setLightItem(tag.contains("LightItem") ? ItemStack.of(tag.getCompound("LightItem")) : ItemStack.EMPTY);
         if (tag.contains("Target")) target = BlockPos.of(tag.getLong("Target"));
+        setOwlMode(parseEnum(OwlMode.class, tag.getString("OwlMode"), OwlMode.FIELD_WORK));
+        setMuseumState(parseEnum(MuseumState.class, tag.getString("MuseumState"), MuseumState.UNASSIGNED));
+        museumDinopedia = tag.contains("MuseumDinopedia")
+            ? ItemStack.of(tag.getCompound("MuseumDinopedia")) : ItemStack.EMPTY;
+    }
+
+    private static <T extends Enum<T>> T parseEnum(Class<T> enumClass, String name, T fallback) {
+        try {
+            return Enum.valueOf(enumClass, name);
+        } catch (IllegalArgumentException exception) {
+            return fallback;
+        }
     }
 
     @Override public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
