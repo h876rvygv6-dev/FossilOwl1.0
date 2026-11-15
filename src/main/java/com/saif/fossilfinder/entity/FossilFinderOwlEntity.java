@@ -59,6 +59,17 @@ import java.util.Set;
 
 /** Server-authoritative fossil-finding companion. */
 public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
+    private static final RawAnimation IDLE_ANIMATION =
+        RawAnimation.begin().thenLoop("animation.fossil_finder_owl.standing");
+    private static final RawAnimation MOVING_ANIMATION =
+        RawAnimation.begin().thenLoop("animation.fossil_finder_owl.moving");
+    private static final RawAnimation FLYING_ANIMATION =
+        RawAnimation.begin().thenLoop("animation.fossil_finder_owl.flying");
+    private static final RawAnimation SITTING_ANIMATION =
+        RawAnimation.begin().thenLoop("animation.fossil_finder_owl.sitting");
+    private static final RawAnimation DANCE_ANIMATION =
+        RawAnimation.begin().thenPlayXTimes("animation.fossil_finder_owl.dance", 2);
+
     private static final EntityDataAccessor<ItemStack> DATA_PICKAXE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> DATA_LIGHT_ITEM = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final Set<String> FOSSIL_BLOCKS = Set.of(
@@ -88,7 +99,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private int scanCooldown;
     private int digTicks;
     private int alarmCooldown;
-    private boolean excavating;
 
     public FossilFinderOwlEntity(EntityType<FossilFinderOwlEntity> type, Level level) {
         super(type, level);
@@ -150,14 +160,12 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (level().isClientSide) return;
         if (!isTame() || getOwner() == null) {
             target = null;
-            excavating = false;
             setNoGravity(false);
             return;
         }
         if (isOrderedToSit()) {
             target = null;
             digTicks = 0;
-            excavating = false;
             getNavigation().stop();
             setNoGravity(false);
             return;
@@ -174,7 +182,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (getOwner() instanceof Player owner && distanceToSqr(owner) > 64.0) {
             target = null;
             digTicks = 0;
-            excavating = false;
             if (distanceToSqr(owner) > 400.0) {
                 teleportTo(owner.getX() + 1.0, owner.getY() + 1.0, owner.getZ() + 1.0);
                 getNavigation().stop();
@@ -229,7 +236,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (mimic != null) playSound(mimic, 0.8F, 1.1F);
             alarmCooldown = 65;
         }
-        excavating = false;
         target = null;
         setNoGravity(true);
         if (tickCount % 12 == 0 || getNavigation().isDone()) {
@@ -250,23 +256,19 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (target == null) return;
         if (!level().hasChunkAt(target) || !isFossilBlock(level().getBlockState(target))) {
             target = null;
-            excavating = false;
             return;
         }
         double distance = distanceToSqr(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5);
         if (distance > 5.0) {
-            excavating = false;
             if (getNavigation().isDone() || tickCount % 20 == 0)
                 getNavigation().moveTo(target.getX() + 0.5, target.getY() + 1.2, target.getZ() + 0.5, 1.05);
             return;
         }
         getNavigation().stop();
-        excavating = true;
         if (++digTicks >= 55) {
             excavateTarget();
             digTicks = 0;
             target = null;
-            excavating = false;
         }
     }
 
@@ -309,6 +311,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (!remainder.isEmpty()) level().addFreshEntity(new ItemEntity(level(), minedPos.getX() + 0.5, minedPos.getY() + 0.5, minedPos.getZ() + 0.5, remainder));
         }
         level().removeBlock(minedPos, false);
+        triggerAnim("action", "dance");
         pickaxe.hurtAndBreak(1, this, entity -> setPickaxe(ItemStack.EMPTY));
         setPickaxe(pickaxe);
         playHoot(false);
@@ -408,6 +411,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (isHealingFood(held) && getHealth() < getMaxHealth()) {
                 heal(4.0F);
                 if (!player.getAbilities().instabuild) held.shrink(1);
+                triggerAnim("action", "dance");
                 player.displayClientMessage(Component.literal("Your owl looks healthier."), true);
                 return InteractionResult.CONSUME;
             }
@@ -416,7 +420,6 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 setOrderedToSit(!isOrderedToSit());
                 target = null;
                 digTicks = 0;
-                excavating = false;
                 getNavigation().stop();
                 player.displayClientMessage(Component.literal(isOrderedToSit() ? "Your owl will perch here." : "Your owl will follow your expedition."), true);
                 return InteractionResult.CONSUME;
@@ -502,11 +505,13 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     @Override public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
         controllers.add(new AnimationController<>(this, "movement", 5, state ->
-            state.setAndContinue(state.isMoving()
-                ? RawAnimation.begin().thenLoop("animation.owl.walk")
-                : RawAnimation.begin().thenLoop("animation.owl.idle"))));
-        controllers.add(new AnimationController<>(this, "excavation", 0, state -> excavating
-            ? state.setAndContinue(RawAnimation.begin().thenLoop("animation.owl.dig")) : PlayState.STOP));
+            state.setAndContinue(isOrderedToSit() ? SITTING_ANIMATION
+                : state.isMoving() ? MOVING_ANIMATION : IDLE_ANIMATION)));
+        controllers.add(new AnimationController<>(this, "flight", 0, state ->
+            !isOrderedToSit() && state.isMoving()
+                ? state.setAndContinue(FLYING_ANIMATION) : PlayState.STOP));
+        controllers.add(new AnimationController<>(this, "action", 0, state -> PlayState.STOP)
+            .triggerableAnim("dance", DANCE_ANIMATION));
     }
     @Override public AnimatableInstanceCache getAnimatableInstanceCache() { return cache; }
     @Override public net.minecraft.world.entity.AgeableMob getBreedOffspring(ServerLevel level, net.minecraft.world.entity.AgeableMob mate) { return null; }

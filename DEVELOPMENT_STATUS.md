@@ -11,7 +11,8 @@ This is an in-progress source update based on the user's uploaded Forge 2.1.0 pr
 - Added basic torch/lantern item acceptance and persistence, plus owner interaction catchphrases.
 - Corrected the fossil block registry IDs to the names used by the supplied Fossils and Archaeology Revival 9.3.4.0 JAR (`fossil_stone`, `fossil_deepslate`, etc.).
 - Registered the existing owl hoot audio through `sounds.json` and moved the OGG into the expected `sounds/` folder.
-- Added the supplied low-poly Blathers Collada assets, but switched the active renderer back to the stable block geometry in `geo/owl.geo.json` after the skinned mesh rendered badly in-game. The existing head and hand attachments remain available on the active model.
+- Replaced the prior owl geometry with the supplied Blockbench model, extracted its default/Blathers/Celeste textures, and preserved the head/hand attachment bones for hats and held items. Owls use the default skin unless their custom name is exactly Blathers or Celeste (case-insensitive).
+- Replaced the prior animation set with the supplied standing, sitting, moving, flying, and dance motions. Adapted Blockbench variable expressions to GeckoLib Molang; idle uses the standing pose, and a short dance plays after feeding a hurt owl or excavating ore.
 - Replaced the placeholder cargo panel with a fossil-textured GUI, 15 visible cargo slots, functional hat and pickaxe slots, player inventory/hotbar, and an owl preview. The hat slot reads and writes the owl's normal head equipment slot. Cargo saved in the previous 27-slot layout is retained and queued into the new slots as capacity opens.
 
 ## Not complete / not verified
