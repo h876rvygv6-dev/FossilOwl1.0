@@ -1,20 +1,24 @@
 package com.saif.fossilfinder.entity;
 
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.Set;
 
 public final class FossilMiningRules {
+    private static final Set<String> PICKAXE_ROUTE_BLOCKS = Set.of(
+        "minecraft:stone", "minecraft:granite", "minecraft:deepslate", "minecraft:tuff");
+    private static final Set<String> SHOVEL_ROUTE_BLOCKS = Set.of(
+        "minecraft:sand", "minecraft:red_sand", "minecraft:gravel", "minecraft:dirt",
+        "minecraft:grass_block", "minecraft:coarse_dirt", "minecraft:rooted_dirt",
+        "minecraft:podzol", "minecraft:mycelium", "minecraft:dirt_path");
+
     private FossilMiningRules() {}
 
-    public static boolean isPickaxeRouteBlock(BlockState state) {
-        return state.is(Blocks.STONE) || state.is(Blocks.GRANITE)
-            || state.is(Blocks.DEEPSLATE) || state.is(Blocks.TUFF);
+    public static boolean isPickaxeRouteBlock(ResourceLocation blockId) {
+        return blockId != null && PICKAXE_ROUTE_BLOCKS.contains(blockId.toString());
     }
 
-    public static boolean isShovelRouteBlock(BlockState state) {
-        return state.is(Blocks.SAND) || state.is(Blocks.RED_SAND) || state.is(Blocks.GRAVEL)
-            || state.is(Blocks.DIRT) || state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.COARSE_DIRT)
-            || state.is(Blocks.ROOTED_DIRT) || state.is(Blocks.PODZOL) || state.is(Blocks.MYCELIUM)
-            || state.is(Blocks.DIRT_PATH);
+    public static boolean isShovelRouteBlock(ResourceLocation blockId) {
+        return blockId != null && SHOVEL_ROUTE_BLOCKS.contains(blockId.toString());
     }
 }

@@ -820,11 +820,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     private boolean isPickaxeTunnelBlock(BlockState state) {
-        return FossilMiningRules.isPickaxeRouteBlock(state);
+        return FossilMiningRules.isPickaxeRouteBlock(ForgeRegistries.BLOCKS.getKey(state.getBlock()));
     }
 
     private boolean isShovelBlock(BlockState state) {
-        return FossilMiningRules.isShovelRouteBlock(state);
+        return FossilMiningRules.isShovelRouteBlock(ForgeRegistries.BLOCKS.getKey(state.getBlock()));
     }
 
     private void requestShovel() {

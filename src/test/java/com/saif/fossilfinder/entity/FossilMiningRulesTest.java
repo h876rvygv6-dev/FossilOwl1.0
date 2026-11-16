@@ -1,10 +1,7 @@
 package com.saif.fossilfinder.entity;
 
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
-
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,23 +9,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FossilMiningRulesTest {
     @Test
     void pickaxeRouteMiningIsLimitedToSpecifiedStone() {
-        Set<Block> allowed = Set.of(Blocks.STONE, Blocks.GRANITE, Blocks.DEEPSLATE, Blocks.TUFF);
-        for (Block block : allowed) {
-            assertTrue(FossilMiningRules.isPickaxeRouteBlock(block.defaultBlockState()));
-        }
-
-        assertFalse(FossilMiningRules.isPickaxeRouteBlock(Blocks.DIAMOND_ORE.defaultBlockState()));
-        assertFalse(FossilMiningRules.isPickaxeRouteBlock(Blocks.IRON_ORE.defaultBlockState()));
-        assertFalse(FossilMiningRules.isPickaxeRouteBlock(Blocks.ANDESITE.defaultBlockState()));
+        assertTrue(FossilMiningRules.isPickaxeRouteBlock(blockId("stone")));
+        assertTrue(FossilMiningRules.isPickaxeRouteBlock(blockId("granite")));
+        assertTrue(FossilMiningRules.isPickaxeRouteBlock(blockId("deepslate")));
+        assertTrue(FossilMiningRules.isPickaxeRouteBlock(blockId("tuff")));
+        assertFalse(FossilMiningRules.isPickaxeRouteBlock(blockId("diamond_ore")));
+        assertFalse(FossilMiningRules.isPickaxeRouteBlock(blockId("iron_ore")));
+        assertFalse(FossilMiningRules.isPickaxeRouteBlock(blockId("andesite")));
     }
 
     @Test
     void shovelRouteMiningIsLimitedToSoilAndLooseBlocks() {
-        assertTrue(FossilMiningRules.isShovelRouteBlock(Blocks.SAND.defaultBlockState()));
-        assertTrue(FossilMiningRules.isShovelRouteBlock(Blocks.GRAVEL.defaultBlockState()));
-        assertTrue(FossilMiningRules.isShovelRouteBlock(Blocks.DIRT.defaultBlockState()));
-        assertTrue(FossilMiningRules.isShovelRouteBlock(Blocks.GRASS_BLOCK.defaultBlockState()));
-        assertFalse(FossilMiningRules.isShovelRouteBlock(Blocks.STONE.defaultBlockState()));
-        assertFalse(FossilMiningRules.isShovelRouteBlock(Blocks.COAL_ORE.defaultBlockState()));
+        assertTrue(FossilMiningRules.isShovelRouteBlock(blockId("sand")));
+        assertTrue(FossilMiningRules.isShovelRouteBlock(blockId("gravel")));
+        assertTrue(FossilMiningRules.isShovelRouteBlock(blockId("dirt")));
+        assertTrue(FossilMiningRules.isShovelRouteBlock(blockId("grass_block")));
+        assertFalse(FossilMiningRules.isShovelRouteBlock(blockId("stone")));
+        assertFalse(FossilMiningRules.isShovelRouteBlock(blockId("coal_ore")));
+    }
+
+    private ResourceLocation blockId(String path) {
+        return new ResourceLocation("minecraft", path);
     }
 }
