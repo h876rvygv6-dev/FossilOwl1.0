@@ -21,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
@@ -52,6 +53,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.network.NetworkHooks;
@@ -81,12 +83,15 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         RawAnimation.begin().thenLoop("animation.fossil_finder_owl.flying");
     private static final RawAnimation SITTING_ANIMATION =
         RawAnimation.begin().thenLoop("animation.fossil_finder_owl.sitting");
+    private static final RawAnimation MINING_ANIMATION =
+        RawAnimation.begin().thenLoop("animation.fossil_finder_owl.mining");
     private static final RawAnimation DANCE_ANIMATION =
         RawAnimation.begin().thenPlayXTimes("animation.fossil_finder_owl.dance", 2);
 
     private static final EntityDataAccessor<ItemStack> DATA_PICKAXE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> DATA_LIGHT_ITEM = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<Boolean> DATA_MUSEUM_MODE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> DATA_MINING = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.BOOLEAN);
     private static final Set<String> FOSSIL_BLOCKS = Set.of(
         "fossil:fossil_stone", "fossil:fossil_deepslate", "fossil:fossil_calcite",
         "fossil:fossil_dripstone", "fossil:fossil_sandstone", "fossil:fossil_red_sandstone",
@@ -102,6 +107,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         "minecraft:chicken", "minecraft:cooked_chicken", "minecraft:rabbit", "minecraft:cooked_rabbit");
     private static final ResourceLocation HOOT_ID = new ResourceLocation("fossil_finder_owl", "fossil_owl_hoot");
     private static final int CARGO_SIZE = 15;
+    private static final int MINING_SOUND_INTERVAL_TICKS = 10;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     private final SimpleContainer cargo = new SimpleContainer(CARGO_SIZE);
@@ -146,6 +152,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         entityData.define(DATA_PICKAXE, ItemStack.EMPTY);
         entityData.define(DATA_LIGHT_ITEM, ItemStack.EMPTY);
         entityData.define(DATA_MUSEUM_MODE, false);
+        entityData.define(DATA_MINING, false);
     }
 
     private void setPickaxe(ItemStack stack) {
@@ -169,6 +176,14 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     private void setMuseumMode(boolean museumMode) {
         entityData.set(DATA_MUSEUM_MODE, museumMode);
+    }
+
+    private boolean isMining() {
+        return entityData.get(DATA_MINING);
+    }
+
+    private void setMining(boolean mining) {
+        if (isMining() != mining) entityData.set(DATA_MINING, mining);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -203,17 +218,20 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     @Override public void tick() {
         super.tick();
         if (level().isClientSide) return;
+        if (target == null) setMining(false);
         if (upsetTicks > 0) {
             upsetTicks--;
             if (getOwner() instanceof Player owner) turnAwayFrom(owner);
         }
         if (!isTame() || getOwner() == null) {
+            setMining(false);
             target = null;
             setNoGravity(false);
             return;
         }
         if (!isMuseumMode() && getOwner() instanceof Player owner) tickFieldworkDialogue(owner);
         if (isOrderedToSit()) {
+            setMining(false);
             target = null;
             digTicks = 0;
             getNavigation().stop();
@@ -229,6 +247,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (alarmCooldown > 0) alarmCooldown--;
         restorePendingCargo();
         if (isMuseumMode()) {
+            setMining(false);
             if (getOwner() instanceof Player owner) {
                 tickMuseumDialogue(owner);
                 tickMuseumMode(owner);
@@ -246,6 +265,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             fieldworkQuietTicks = 0;
         }
         if (getOwner() instanceof Player owner && distanceToSqr(owner) > 64.0) {
+            setMining(false);
             recordFieldworkFollowing();
             target = null;
             digTicks = 0;
@@ -258,16 +278,19 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return;
         }
         if (cargoFull()) {
+            setMining(false);
             target = null;
             returnToOwner();
             return;
         }
+        if (pickaxe.isEmpty()) setMining(false);
         if (!pickaxe.isEmpty()) {
             if (target == null || !isFossilBlock(level().getBlockState(target))) {
                 if (scanCooldown-- <= 0) {
                     target = findFossil();
                     scanCooldown = 30;
                     digTicks = 0;
+                    setMining(false);
                 }
             }
             if (target != null) {
@@ -617,6 +640,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (mimic != null) playSound(mimic, 0.8F, 1.1F);
             alarmCooldown = 65;
         }
+        setMining(false);
         target = null;
         setNoGravity(true);
         if (tickCount % 12 == 0 || getNavigation().isDone()) {
@@ -634,22 +658,31 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     private void investigateAndExcavate() {
-        if (target == null) return;
+        if (target == null) {
+            setMining(false);
+            return;
+        }
         if (!level().hasChunkAt(target) || !isFossilBlock(level().getBlockState(target))) {
+            setMining(false);
             target = null;
             return;
         }
         double distance = distanceToSqr(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5);
         if (distance > 5.0) {
+            setMining(false);
             if (getNavigation().isDone() || tickCount % 20 == 0)
                 getNavigation().moveTo(target.getX() + 0.5, target.getY() + 1.2, target.getZ() + 0.5, 1.05);
             return;
         }
         getNavigation().stop();
+        setMining(true);
         if (++digTicks >= 55) {
             excavateTarget();
+            setMining(false);
             digTicks = 0;
             target = null;
+        } else if (digTicks % MINING_SOUND_INTERVAL_TICKS == 0) {
+            playMiningSound(level().getBlockState(target), target, false);
         }
     }
 
@@ -688,6 +721,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         BlockState state = level().getBlockState(target);
         if (!isFossilBlock(state)) return;
         BlockPos minedPos = target;
+        playMiningSound(state, minedPos, true);
         var breaker = getOwner();
         if (breaker == null) breaker = this;
         for (ItemStack drop : Block.getDrops(state, serverLevel, minedPos, level().getBlockEntity(minedPos), breaker, pickaxe)) {
@@ -704,6 +738,14 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         setPickaxe(pickaxe);
         playHoot(false);
         if (cargoFull() || pickaxe.isEmpty()) returnToOwner();
+    }
+
+    private void playMiningSound(BlockState state, BlockPos pos, boolean breaking) {
+        SoundType soundType = state.getSoundType();
+        SoundEvent sound = breaking ? soundType.getBreakSound() : soundType.getHitSound();
+        float volume = (soundType.getVolume() + 1.0F) / 2.0F;
+        float pitch = soundType.getPitch() * (breaking ? 0.8F : 0.8F + random.nextFloat() * 0.4F);
+        level().playSound(null, pos, sound, SoundSource.BLOCKS, volume, pitch);
     }
 
     private void collectNearbyDrops() {
@@ -1084,6 +1126,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         controllers.add(new AnimationController<>(this, "flight", 0, state ->
             !isOrderedToSit() && state.isMoving()
                 ? state.setAndContinue(FLYING_ANIMATION) : PlayState.STOP));
+        controllers.add(new AnimationController<>(this, "mining", 0, state ->
+            isMining() ? state.setAndContinue(MINING_ANIMATION) : PlayState.STOP));
         controllers.add(new AnimationController<>(this, "action", 0, state -> PlayState.STOP)
             .triggerableAnim("dance", DANCE_ANIMATION));
     }

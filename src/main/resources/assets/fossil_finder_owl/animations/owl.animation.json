@@ -64,6 +64,22 @@
 				}
 			}
 		},
+		"animation.fossil_finder_owl.mining": {
+			"loop": true,
+			"animation_length": 0.5,
+			"bones": {
+				"body": {
+					"position": {
+						"vector": [0, "-math.abs(math.sin(query.anim_time * 720)) * 0.25", 0]
+					}
+				},
+				"head": {
+					"rotation": {
+						"vector": ["15.0 + math.sin(query.anim_time * 720) * 12.0", 0, 0]
+					}
+				}
+			}
+		},
 		"animation.fossil_finder_owl.flying": {
 			"loop": true,
 			"animation_length": 1.0,
