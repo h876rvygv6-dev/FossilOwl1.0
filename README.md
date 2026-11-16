@@ -16,7 +16,7 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 
 ## In-game access
 - Creative inventory: spawn egg named **PalEowl Spawn Egg**.
-- Creative inventory: all six hats are in the Combat tab. Equip one in the player's helmet slot or use it on an owned owl. The owl's cargo screen has a hat slot for equipping, swapping, or retrieving hats; crouch and interact empty-handed still retrieves the hat directly.
+- Creative inventory: all six 3D hats are in the Combat tab. Their icons and dropped items use the Blockbench GUI and ground views. Equip one in the player's helmet slot or use it on an owned owl. The owl's cargo screen has a hat slot for equipping, swapping, or retrieving hats; crouch and interact empty-handed still retrieves the hat directly.
 - Hat recipes use leather, string, wool, and Fossils and Archaeology items. Hats are durable, grant +6 maximum health (+10 for the dinosaur plushie hats), and do not provide armor protection.
 - Command: `/summon fossil_finder_owl:fossil_finder_owl ~ ~ ~`
 - Tame: right-click with one of `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, or `fossil:fossil_tar`.
@@ -31,6 +31,7 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 ## Important reconstruction notes
 - The original JAR contains intermediary-mapped Fabric bytecode, not the original Java source. This project is a clean Forge-side reconstruction, not a byte-for-byte port.
 - The active owl renderer uses the supplied Blockbench geometry and textures, with GeckoLib animations and added head/hand attachment points. The editable Blockbench project is kept at `tools/blockbench/fossil_finder_owl.bbmodel`.
+- The six wearable hat models and their embedded textures are kept in `tools/blockbench/hats`; run `python3 tools/blockbench/build_hat_models.py` after editing them to regenerate their item models and texture assets.
 - Fossils and Archaeology block and item IDs were checked against its supplied 9.3.4.0 JAR. The verified fossil blocks are `fossil:fossil_stone`, `fossil:fossil_deepslate`, `fossil:fossil_calcite`, `fossil:fossil_dripstone`, `fossil:fossil_sandstone`, `fossil:fossil_red_sandstone`, `fossil:fossil_tuff`, and `fossil:amber_ore`. Verified fossil gifts are `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, and `fossil:fossil_tar`. There is no registered `fossil:amber` item in the supplied JAR, so it is deliberately not used as a gift.
 - This reconstruction includes biome spawning in forest/plains, a spawn egg, summonable entity, taming, stay/follow, a 15-slot cargo inventory, and basic fossil-block excavation. An owl now abandons its fossil target to follow its owner when they move more than eight blocks away; mining, loot collection, and movement still need in-game validation.
 - GitHub Actions successfully compiles the source with Gradle, but that build does not verify the in-game model appearance, mining, pickup, or pathfinding. Test the generated JAR in a Forge 1.20.1 instance before treating those behaviors as game-verified.
