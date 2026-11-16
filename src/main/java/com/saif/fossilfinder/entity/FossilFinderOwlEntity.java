@@ -424,7 +424,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         int factIndex = museumFactCounts.getOrDefault(cue.species(), 0);
         String line = MuseumDialogue.line(
             cue, ((ServerLevel) level()).getServer().getResourceManager(), random.nextInt(24), factIndex);
-        owner.displayClientMessage(Component.literal("Blathers: " + line), false);
+        sendDialogue(owner, line);
         museumSpeechCooldown = 80;
         if (cue.type() == MuseumDialogue.CueType.SPECIES_DISPLAYED) {
             museumFactCounts.put(cue.species(), factIndex + 1);
@@ -438,8 +438,13 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (fieldworkQuietCooldown > 0) fieldworkQuietCooldown--;
         if (fieldworkSpeechCooldown > 0 || fieldworkDialogueQueue.isEmpty()) return;
 
-        owner.displayClientMessage(Component.literal("Blathers: " + fieldworkDialogueQueue.poll()), false);
+        sendDialogue(owner, fieldworkDialogueQueue.poll());
         fieldworkSpeechCooldown = 40;
+    }
+
+    private void sendDialogue(Player recipient, String line) {
+        recipient.displayClientMessage(
+            Component.empty().append(getName()).append(Component.literal(": " + line)), false);
     }
 
     private void queueFieldworkDialogue(FieldworkDialogue.Cue cue) {
@@ -810,10 +815,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 target = null;
                 digTicks = 0;
                 getNavigation().stop();
-                player.displayClientMessage(Component.literal(
-                    "Blathers: " + MuseumDialogue.line(
-                        new MuseumDialogue.Cue(MuseumDialogue.CueType.MODE_STARTED, ""),
-                        ((ServerLevel) level()).getServer().getResourceManager(), random.nextInt(12), 0)), false);
+                sendDialogue(player, MuseumDialogue.line(
+                    new MuseumDialogue.Cue(MuseumDialogue.CueType.MODE_STARTED, ""),
+                    ((ServerLevel) level()).getServer().getResourceManager(), random.nextInt(12), 0));
                 return InteractionResult.CONSUME;
             }
             if (isMuseumMode() && held.isEmpty() && player.isCrouching()) {
@@ -844,8 +848,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             }
             if (held.is(Items.BONE)) {
                 if (isMuseumMode()) {
-                    player.displayClientMessage(Component.literal(
-                        "Blathers: My wings are busy curating. I shall perch when the exhibits are ready."), false);
+                    sendDialogue(player,
+                        "My wings are busy curating. I shall perch when the exhibits are ready.");
                     return InteractionResult.CONSUME;
                 }
                 setOrderedToSit(!isOrderedToSit());
