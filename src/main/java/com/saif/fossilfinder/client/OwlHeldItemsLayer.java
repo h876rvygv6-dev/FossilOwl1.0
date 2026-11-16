@@ -17,7 +17,7 @@ public class OwlHeldItemsLayer extends BlockAndItemGeoLayer<FossilFinderOwlEntit
     @Override
     protected ItemStack getStackForBone(GeoBone bone, FossilFinderOwlEntity owl) {
         return switch (bone.getName()) {
-            case "right_hand" -> owl.getPickaxeForRender();
+            case "right_hand" -> owl.getMiningToolForRender();
             case "left_hand" -> owl.getLightForRender();
             case "head_item" -> owl.getItemBySlot(EquipmentSlot.HEAD);
             default -> null;

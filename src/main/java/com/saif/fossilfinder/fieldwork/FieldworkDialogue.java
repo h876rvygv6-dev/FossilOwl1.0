@@ -15,6 +15,8 @@ public final class FieldworkDialogue {
         HAT_GIFT,
         HEALING,
         PICKAXE,
+        SHOVEL,
+        SHOVEL_REQUEST,
         REJECTED_PICKAXE,
         REJECTED_HAT,
         LIGHT,
@@ -108,6 +110,16 @@ public final class FieldworkDialogue {
         "Now we can excavate. I promise to return with evidence.",
         "A fine instrument for our fieldwork. Shall we begin?"
     );
+    private static final List<String> SHOVEL = List.of(
+        "Thank you for the shovel. I can clear the softer layers now.",
+        "A shovel! This will help me reach the fossil through the soil.",
+        "Excellent. Sand and gravel will no longer stop our expedition."
+    );
+    private static final List<String> SHOVEL_REQUEST = List.of(
+        "The fossil is behind soil. Could you bring me a shovel?",
+        "I found a fossil, but dirt blocks the way. I need a shovel.",
+        "Sand and gravel are in the way. Please bring me a shovel."
+    );
     private static final List<String> REJECTED_PICKAXE = List.of(
         "I need a sturdier pickaxe for fossil-bearing stone.",
         "That tool is a little too delicate for proper excavation.",
@@ -179,6 +191,8 @@ public final class FieldworkDialogue {
             case HAT_GIFT -> HAT_GIFT;
             case HEALING -> HEALING;
             case PICKAXE -> PICKAXE;
+            case SHOVEL -> SHOVEL;
+            case SHOVEL_REQUEST -> SHOVEL_REQUEST;
             case REJECTED_PICKAXE -> REJECTED_PICKAXE;
             case REJECTED_HAT -> REJECTED_HAT;
             case LIGHT -> LIGHT;

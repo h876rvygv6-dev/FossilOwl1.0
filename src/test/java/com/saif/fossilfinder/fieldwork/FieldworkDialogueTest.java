@@ -31,4 +31,12 @@ class FieldworkDialogueTest {
             }
         }
     }
+
+    @Test
+    void everyShovelRequestVariantNamesTheNeededTool() {
+        for (int variant = 0; variant < 24; variant++) {
+            assertTrue(FieldworkDialogue.line(FieldworkDialogue.Cue.SHOVEL_REQUEST, variant)
+                .toLowerCase().contains("shovel"));
+        }
+    }
 }
