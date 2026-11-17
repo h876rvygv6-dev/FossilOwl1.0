@@ -15,6 +15,11 @@ public final class OwlItems {
         "fossil_finder_owl_spawn_egg",
         () -> new ForgeSpawnEggItem(OwlEntities.OWL, 0xA99A7B, 0xE8DCC2, new Item.Properties()));
 
+    public static final RegistryObject<Item> MUSEUM_GUIDE = ITEMS.register(
+        "museum_guide", () -> new Item(new Item.Properties()));
+    public static final RegistryObject<Item> FIELD_NOTES = ITEMS.register(
+        "field_notes", () -> new Item(new Item.Properties()));
+
     public static final RegistryObject<Item> PALEO_COWBOY_HAT = hat("paleo_cowboy_hat", 6.0);
     public static final RegistryObject<Item> PALEONTOLOGIST_EXPLORER_HAT = hat("paleontologist_explorer_hat", 6.0);
     public static final RegistryObject<Item> TRICERATOPS_PLUSHIE_HAT = hat("dino_plushie_hat_triceratops", 10.0);
