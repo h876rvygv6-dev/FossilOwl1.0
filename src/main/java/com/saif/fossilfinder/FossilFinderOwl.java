@@ -50,7 +50,8 @@ public class FossilFinderOwl {
             event.accept(OwlItems.SPAWN_EGG);
         }
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(OwlItems.DINOPEDIA);
+            event.accept(OwlItems.MUSEUM_GUIDE);
+            event.accept(OwlItems.FIELD_NOTES);
         }
         if (event.getTabKey() == CreativeModeTabs.COMBAT) {
             event.accept(OwlItems.PALEO_COWBOY_HAT);

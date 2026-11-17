@@ -84,7 +84,7 @@ public final class MuseumDialogue {
         "Excellent framing. I shall add this to the tour: %s",
         "There! The specimen is safe, and the story is even better: %s",
         "A curator's reward is a well-placed bone and a good fact: %s",
-        "Displayed with care! My Dinopedia tells us that %s"
+        "Displayed with care! My Museum Guide tells us that %s"
     );
     private static final List<String> NEEDS_SPECIMENS_LINES = List.of(
         "I am ready to curate! Could you add some fossil bones to my cargo?",

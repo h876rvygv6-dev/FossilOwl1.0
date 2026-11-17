@@ -116,7 +116,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private static final int MINING_SOUND_INTERVAL_TICKS = 10;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
-    private final SimpleContainer cargo = new SimpleContainer(CARGO_SIZE);
+    private final CargoContainer cargo = new CargoContainer(CARGO_SIZE);
     private NonNullList<ItemStack> pendingCargo = NonNullList.withSize(12, ItemStack.EMPTY);
     private final HatContainer hatContainer = new HatContainer();
     private final PickaxeContainer pickaxeContainer = new PickaxeContainer();
@@ -992,6 +992,18 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!remaining.isEmpty()) pendingCargo.add(remaining);
     }
 
+    private void giveFieldNotes(Player player, ItemStack held) {
+        if (isMuseumMode()) stopMuseumMode(player);
+        ItemStack remaining = addCargo(held.copyWithCount(1));
+        if (!remaining.isEmpty()) {
+            player.displayClientMessage(Component.literal("My cargo is full; I cannot keep these field notes."), true);
+            return;
+        }
+        if (!player.getAbilities().instabuild) held.shrink(1);
+        reactHappy();
+        queueFieldworkDialogue(FieldworkDialogue.Cue.CARGO);
+    }
+
     private void openCargo(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
             NetworkHooks.openScreen(serverPlayer, new SimpleMenuProvider((id, playerInventory, viewer) ->
@@ -1013,7 +1025,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return InteractionResult.CONSUME;
         }
         if (isTame() && isOwnedBy(player)) {
-            if (held.is(OwlItems.DINOPEDIA.get())) {
+            if (held.is(OwlItems.FIELD_NOTES.get())) {
+                giveFieldNotes(player, held);
+                return InteractionResult.CONSUME;
+            }
+            if (held.is(OwlItems.MUSEUM_GUIDE.get())) {
                 if (isMuseumMode()) {
                     player.displayClientMessage(Component.literal("Your owl is already curating a museum."), true);
                     return InteractionResult.CONSUME;
@@ -1190,13 +1206,18 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             pendingCargo = NonNullList.withSize(pendingSize, ItemStack.EMPTY);
             ContainerHelper.loadAllItems(pendingTag, pendingCargo);
         }
-        if (tag.contains("Cargo")) {
-            NonNullList<ItemStack> cargoItems = NonNullList.withSize(27, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(tag.getCompound("Cargo"), cargoItems);
-            for (int i = 0; i < cargo.getContainerSize(); i++) cargo.setItem(i, cargoItems.get(i));
-            for (int i = cargo.getContainerSize(); i < cargoItems.size(); i++) addPendingCargo(cargoItems.get(i));
+        cargo.setLoading(true);
+        try {
+            if (tag.contains("Cargo")) {
+                NonNullList<ItemStack> cargoItems = NonNullList.withSize(27, ItemStack.EMPTY);
+                ContainerHelper.loadAllItems(tag.getCompound("Cargo"), cargoItems);
+                for (int i = 0; i < cargo.getContainerSize(); i++) cargo.setItem(i, cargoItems.get(i));
+                for (int i = cargo.getContainerSize(); i < cargoItems.size(); i++) addPendingCargo(cargoItems.get(i));
+            }
+            cargo.setChanged();
+        } finally {
+            cargo.setLoading(false);
         }
-        cargo.setChanged();
         setPickaxe(tag.contains("Pickaxe") ? ItemStack.of(tag.getCompound("Pickaxe")) : ItemStack.EMPTY);
         setShovel(tag.contains("Shovel") ? ItemStack.of(tag.getCompound("Shovel")) : ItemStack.EMPTY);
         setLightItem(tag.contains("LightItem") ? ItemStack.of(tag.getCompound("LightItem")) : ItemStack.EMPTY);
@@ -1364,6 +1385,28 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
         @Override public void clearContent() {
             setItem(0, ItemStack.EMPTY);
+        }
+    }
+
+    private final class CargoContainer extends SimpleContainer {
+        private boolean loading;
+
+        private CargoContainer(int size) {
+            super(size);
+        }
+
+        private void setLoading(boolean loading) {
+            this.loading = loading;
+        }
+
+        @Override public void setItem(int slot, ItemStack stack) {
+            super.setItem(slot, stack);
+            if (!loading && !level().isClientSide && isMuseumMode()
+                && !stack.isEmpty() && stack.is(OwlItems.FIELD_NOTES.get())
+                && getOwner() instanceof Player owner) {
+                stopMuseumMode(owner);
+                reactHappy();
+            }
         }
     }
 
