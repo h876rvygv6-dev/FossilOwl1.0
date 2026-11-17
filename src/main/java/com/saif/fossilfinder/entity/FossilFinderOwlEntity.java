@@ -2,6 +2,7 @@ package com.saif.fossilfinder.entity;
 
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import com.saif.fossilfinder.item.OwlHatItem;
+import com.saif.fossilfinder.registry.OwlItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -40,6 +41,7 @@ import net.minecraft.world.entity.monster.Skeleton;
 import net.minecraft.world.entity.monster.Spider;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -72,6 +74,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     private static final EntityDataAccessor<ItemStack> DATA_PICKAXE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
     private static final EntityDataAccessor<ItemStack> DATA_LIGHT_ITEM = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<Boolean> DATA_FIELD_WORK_MODE = SynchedEntityData.defineId(FossilFinderOwlEntity.class, EntityDataSerializers.BOOLEAN);
     private static final Set<String> FOSSIL_BLOCKS = Set.of(
         "fossil:fossil_stone", "fossil:fossil_deepslate", "fossil:fossil_calcite",
         "fossil:fossil_dripstone", "fossil:fossil_sandstone", "fossil:fossil_red_sandstone",
@@ -89,7 +92,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private static final int CARGO_SIZE = 15;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
-    private final SimpleContainer cargo = new SimpleContainer(CARGO_SIZE);
+    private int lastFieldNotesCount;
+    private int lastMuseumGuideCount;
+    private boolean suppressCargoModeChanges;
+    private final CargoContainer cargo = new CargoContainer();
     private NonNullList<ItemStack> pendingCargo = NonNullList.withSize(12, ItemStack.EMPTY);
     private final HatContainer hatContainer = new HatContainer();
     private final PickaxeContainer pickaxeContainer = new PickaxeContainer();
@@ -110,6 +116,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         super.defineSynchedData();
         entityData.define(DATA_PICKAXE, ItemStack.EMPTY);
         entityData.define(DATA_LIGHT_ITEM, ItemStack.EMPTY);
+        entityData.define(DATA_FIELD_WORK_MODE, false);
     }
 
     private void setPickaxe(ItemStack stack) {
@@ -125,6 +132,17 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     public ItemStack getPickaxeForRender() { return entityData.get(DATA_PICKAXE); }
     public ItemStack getLightForRender() { return entityData.get(DATA_LIGHT_ITEM); }
+    public boolean isFieldWorkMode() { return entityData.get(DATA_FIELD_WORK_MODE); }
+
+    private void setFieldWorkMode(boolean fieldWorkMode) {
+        if (isFieldWorkMode() != fieldWorkMode) entityData.set(DATA_FIELD_WORK_MODE, fieldWorkMode);
+        if (!fieldWorkMode) {
+            target = null;
+            digTicks = 0;
+            scanCooldown = 0;
+            getNavigation().stop();
+        }
+    }
 
     public static AttributeSupplier.Builder createAttributes() {
         return TamableAnimal.createMobAttributes()
@@ -178,7 +196,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         setNoGravity(true);
         if (alarmCooldown > 0) alarmCooldown--;
         restorePendingCargo();
-        collectNearbyDrops();
+        if (isFieldWorkMode()) collectNearbyDrops();
         if (getOwner() instanceof Player owner && distanceToSqr(owner) > 64.0) {
             target = null;
             digTicks = 0;
@@ -190,12 +208,12 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             }
             return;
         }
-        if (cargoFull()) {
+        if (isFieldWorkMode() && cargoFull()) {
             target = null;
             returnToOwner();
             return;
         }
-        if (!pickaxe.isEmpty()) {
+        if (isFieldWorkMode() && !pickaxe.isEmpty()) {
             if (target == null || !isFossilBlock(level().getBlockState(target))) {
                 if (scanCooldown-- <= 0) {
                     target = findFossil();
@@ -408,6 +426,18 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return InteractionResult.CONSUME;
         }
         if (isTame() && isOwnedBy(player)) {
+            if (held.is(OwlItems.FIELD_NOTES.get())) {
+                setFieldWorkMode(true);
+                if (!player.getAbilities().instabuild) held.shrink(1);
+                player.displayClientMessage(Component.literal("Your owl heads out for field work."), true);
+                return InteractionResult.CONSUME;
+            }
+            if (held.is(OwlItems.MUSEUM_GUIDE.get())) {
+                setFieldWorkMode(false);
+                if (!player.getAbilities().instabuild) held.shrink(1);
+                player.displayClientMessage(Component.literal("Your owl returns to museum mode."), true);
+                return InteractionResult.CONSUME;
+            }
             if (isHealingFood(held) && getHealth() < getMaxHealth()) {
                 heal(4.0F);
                 if (!player.getAbilities().instabuild) held.shrink(1);
@@ -477,9 +507,11 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (!pickaxe.isEmpty()) tag.put("Pickaxe", pickaxe.save(new CompoundTag()));
         if (!lightItem.isEmpty()) tag.put("LightItem", lightItem.save(new CompoundTag()));
         if (target != null) tag.putLong("Target", target.asLong());
+        tag.putBoolean("FieldWorkMode", isFieldWorkMode());
     }
     @Override public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
+        suppressCargoModeChanges = true;
         pendingCargo = NonNullList.withSize(12, ItemStack.EMPTY);
         if (tag.contains("PendingCargo")) {
             CompoundTag pendingTag = tag.getCompound("PendingCargo");
@@ -501,6 +533,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         setPickaxe(tag.contains("Pickaxe") ? ItemStack.of(tag.getCompound("Pickaxe")) : ItemStack.EMPTY);
         setLightItem(tag.contains("LightItem") ? ItemStack.of(tag.getCompound("LightItem")) : ItemStack.EMPTY);
         if (tag.contains("Target")) target = BlockPos.of(tag.getLong("Target"));
+        suppressCargoModeChanges = false;
+        setFieldWorkMode(tag.getBoolean("FieldWorkMode"));
     }
 
     @Override public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -516,6 +550,42 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     @Override public AnimatableInstanceCache getAnimatableInstanceCache() { return cache; }
     @Override public net.minecraft.world.entity.AgeableMob getBreedOffspring(ServerLevel level, net.minecraft.world.entity.AgeableMob mate) { return null; }
     @Override public boolean isFood(ItemStack stack) { return false; }
+
+    private int countCargo(Item item) {
+        int count = 0;
+        for (int slot = 0; slot < cargo.getContainerSize(); slot++) {
+            ItemStack stack = cargo.getItem(slot);
+            if (stack.is(item)) count += stack.getCount();
+        }
+        return count;
+    }
+
+    private void onCargoChanged() {
+        int fieldNotesCount = countCargo(OwlItems.FIELD_NOTES.get());
+        int museumGuideCount = countCargo(OwlItems.MUSEUM_GUIDE.get());
+        boolean fieldNotesAdded = fieldNotesCount > lastFieldNotesCount;
+        boolean museumGuideAdded = museumGuideCount > lastMuseumGuideCount;
+        lastFieldNotesCount = fieldNotesCount;
+        lastMuseumGuideCount = museumGuideCount;
+
+        if (suppressCargoModeChanges) return;
+        if (fieldNotesAdded) setFieldWorkMode(true);
+        else if (museumGuideAdded) setFieldWorkMode(false);
+    }
+
+    private final class CargoContainer extends SimpleContainer {
+        private boolean initialized;
+
+        private CargoContainer() {
+            super(CARGO_SIZE);
+            initialized = true;
+        }
+
+        @Override public void setChanged() {
+            super.setChanged();
+            if (initialized) onCargoChanged();
+        }
+    }
 
     private final class HatContainer extends SimpleContainer {
         private HatContainer() {
