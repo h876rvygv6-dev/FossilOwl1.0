@@ -393,7 +393,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             returnToOwner();
             return;
         }
-        exhibits.sort(Comparator.comparingDouble(exhibit -> distanceToSqr(exhibit.sign().getBlockPos())));
+        exhibits.sort(Comparator.comparingDouble(exhibit -> {
+            BlockPos signPos = exhibit.sign().getBlockPos();
+            return distanceToSqr(signPos.getX() + 0.5, signPos.getY() + 0.5, signPos.getZ() + 0.5);
+        }));
 
         MuseumPlacement placement = findMuseumPlacement(exhibits);
         if (placement == null) {
@@ -607,7 +610,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             }
         }
         if (!changed) return;
-        sign.setFrontText(text);
+        SignText updatedText = text;
+        sign.updateText(current -> updatedText, true);
         sign.setChanged();
         BlockState state = level().getBlockState(sign.getBlockPos());
         level().sendBlockUpdated(sign.getBlockPos(), state, state, 3);
