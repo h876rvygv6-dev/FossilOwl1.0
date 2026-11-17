@@ -36,11 +36,21 @@ dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
     // Fossils and Archaeology is a runtime dependency only; this add-on references its registry IDs, not its Java classes.
     compileOnly files('libs/geckolib-forge-1.20.1-4.8.4.jar')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 processResources {
     inputs.property 'version', project.version
+    inputs.dir 'libs/Dinopedia'
     filesMatching('META-INF/mods.toml') { expand 'version': project.version }
+    from('libs/Dinopedia') {
+        include '*.txt'
+        into 'assets/fossil_finder_owl/dinopedia'
+    }
 }
 
 jar {

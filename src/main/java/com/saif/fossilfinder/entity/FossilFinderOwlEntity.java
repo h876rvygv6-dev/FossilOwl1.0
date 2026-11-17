@@ -2,9 +2,11 @@ package com.saif.fossilfinder.entity;
 
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import com.saif.fossilfinder.item.OwlHatItem;
+import com.saif.fossilfinder.museum.MuseumBoneClassifier;
 import com.saif.fossilfinder.registry.OwlItems;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -36,6 +38,7 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.SitWhenOrderedToGoal;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Monster;
@@ -48,7 +51,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.network.NetworkHooks;
 import software.bernie.geckolib.animatable.GeoEntity;
@@ -59,6 +65,14 @@ import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /** Server-authoritative fossil-finding companion. */
@@ -150,6 +164,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private int digTicks;
     private int alarmCooldown;
     private int nextDialogueTick;
+    private int museumScanCooldown;
+    private int museumStatusCooldown;
+    private String museumStatusKey;
 
     public FossilFinderOwlEntity(EntityType<FossilFinderOwlEntity> type, Level level) {
         super(type, level);
@@ -254,6 +271,10 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             }
             return;
         }
+        if (!isFieldWorkMode()) {
+            if (getOwner() instanceof Player owner) tickMuseumMode(owner);
+            return;
+        }
         if (isFieldWorkMode() && cargoFull()) {
             target = null;
             returnToOwner();
@@ -336,6 +357,319 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             digTicks = 0;
             target = null;
         }
+    }
+
+    private void tickMuseumMode(Player owner) {
+        if (museumScanCooldown > 0) {
+            museumScanCooldown--;
+            return;
+        }
+        museumScanCooldown = 20;
+
+        List<SignBlockEntity> signs = findNearbySigns();
+        if (signs.isEmpty()) {
+            reportMuseumStatus(owner, "dialogue.fossil_finder_owl.museum.needs_sign");
+            returnToOwner();
+            return;
+        }
+
+        List<MuseumExhibit> exhibits = new ArrayList<>();
+        boolean hasFrameGrid = false;
+        for (SignBlockEntity sign : signs) {
+            List<ItemFrame> frames = findMuseumGrid(sign);
+            if (frames.isEmpty()) continue;
+            hasFrameGrid = true;
+            String species = speciesOnSign(sign);
+            if (species == null && signHasText(sign)) continue;
+            exhibits.add(new MuseumExhibit(sign, frames, species));
+        }
+        if (!hasFrameGrid) {
+            reportMuseumStatus(owner, "dialogue.fossil_finder_owl.museum.needs_frames");
+            returnToOwner();
+            return;
+        }
+        if (exhibits.isEmpty()) {
+            reportMuseumStatus(owner, "dialogue.fossil_finder_owl.museum.needs_species_label");
+            returnToOwner();
+            return;
+        }
+        exhibits.sort(Comparator.comparingDouble(exhibit -> distanceToSqr(exhibit.sign().getBlockPos())));
+
+        MuseumPlacement placement = findMuseumPlacement(exhibits);
+        if (placement == null) {
+            reportMuseumStatus(owner, "dialogue.fossil_finder_owl.museum.needs_specimens");
+            returnToOwner();
+            return;
+        }
+        museumStatusKey = null;
+        museumStatusCooldown = 0;
+
+        int placedCount = countDisplayedBones(placement.exhibit().frames(), placement.species());
+        int expectedCount = MuseumBoneClassifier.expectedBoneParts(placement.species()).size();
+        updateMuseumSign(placement.exhibit().sign(), placement.species(), placedCount, expectedCount, null);
+
+        ItemFrame frame = placement.frame();
+        if (distanceToSqr(frame) > 4.0) {
+            if (getNavigation().isDone() || tickCount % 10 == 0) getNavigation().moveTo(frame, 0.9);
+            return;
+        }
+        getNavigation().stop();
+        if (!frame.isAlive() || !frame.getItem().isEmpty()) return;
+
+        ItemStack specimen = cargo.getItem(placement.cargoSlot()).copyWithCount(1);
+        frame.setItem(specimen, true);
+        if (!ItemStack.isSameItemSameTags(frame.getItem(), specimen)) return;
+        cargo.removeItem(placement.cargoSlot(), 1);
+        placedCount = countDisplayedBones(placement.exhibit().frames(), placement.species());
+        boolean complete = placedCount >= expectedCount;
+        List<String> facts = complete ? loadMuseumFacts(placement.species()) : List.of();
+        updateMuseumSign(placement.exhibit().sign(), placement.species(), placedCount, expectedCount, facts);
+        reactHappy();
+        playHoot(false);
+
+        if (complete) {
+            awardAdvancement(owner, "opening_day");
+            String details = facts.stream().limit(2).reduce((first, next) -> first + " " + next)
+                .orElse("Every specimen tells a piece of this ancient story.");
+            sayLine(owner, "Our " + MuseumBoneClassifier.displayName(placement.species())
+                + " exhibit is complete! Did you know? " + details);
+        } else {
+            sayLine(owner, "One more " + MuseumBoneClassifier.displayName(placement.species())
+                + " specimen displayed. " + placedCount + " of " + expectedCount + " pieces are in place.");
+        }
+    }
+
+    private List<SignBlockEntity> findNearbySigns() {
+        List<SignBlockEntity> signs = new ArrayList<>();
+        BlockPos origin = blockPosition();
+        for (BlockPos pos : BlockPos.betweenClosed(
+            origin.offset(-10, -5, -10), origin.offset(10, 5, 10))) {
+            if (level().getBlockEntity(pos) instanceof SignBlockEntity sign) signs.add(sign);
+        }
+        return signs;
+    }
+
+    private List<ItemFrame> findMuseumGrid(SignBlockEntity sign) {
+        BlockPos signPos = sign.getBlockPos();
+        AABB bounds = new AABB(signPos).inflate(8.0, 4.0, 8.0);
+        List<ItemFrame> nearbyFrames = level().getEntitiesOfClass(ItemFrame.class, bounds,
+            frame -> frame.isAlive() && !frame.isInvisible()
+                && frame.distanceToSqr(signPos.getX() + 0.5, signPos.getY() + 0.5, signPos.getZ() + 0.5) <= 100.0);
+        List<ItemFrame> bestGrid = List.of();
+        double bestDistance = Double.MAX_VALUE;
+
+        for (ItemFrame seed : nearbyFrames) {
+            Direction facing = seed.getDirection();
+            if (facing.getAxis() != Direction.Axis.X && facing.getAxis() != Direction.Axis.Z) continue;
+            BlockPos seedPos = seed.blockPosition();
+            int seedColumn = horizontalCoordinate(seedPos, facing);
+            for (int columnOffset = 0; columnOffset < 4; columnOffset++) {
+                for (int rowOffset = 0; rowOffset < 2; rowOffset++) {
+                    int firstColumn = seedColumn - columnOffset;
+                    int topY = seedPos.getY() + rowOffset;
+                    List<ItemFrame> cells = new ArrayList<>(8);
+                    boolean completeGrid = true;
+                    for (int row = 0; row < 2 && completeGrid; row++) {
+                        for (int column = 0; column < 4; column++) {
+                            BlockPos cellPos = gridCell(seedPos, facing, firstColumn + column, topY - row);
+                            ItemFrame cell = nearbyFrames.stream()
+                                .filter(candidate -> candidate.getDirection() == facing
+                                    && candidate.blockPosition().equals(cellPos))
+                                .findFirst().orElse(null);
+                            if (cell == null) {
+                                completeGrid = false;
+                                break;
+                            }
+                            cells.add(cell);
+                        }
+                    }
+                    if (!completeGrid) continue;
+                    double gridDistance = cells.stream().mapToDouble(frame ->
+                        frame.distanceToSqr(signPos.getX() + 0.5, signPos.getY() + 0.5, signPos.getZ() + 0.5))
+                        .average().orElse(Double.MAX_VALUE);
+                    if (gridDistance < bestDistance) {
+                        bestDistance = gridDistance;
+                        bestGrid = cells;
+                    }
+                }
+            }
+        }
+        return bestGrid;
+    }
+
+    private static int horizontalCoordinate(BlockPos pos, Direction facing) {
+        return facing.getAxis() == Direction.Axis.Z ? pos.getX() : pos.getZ();
+    }
+
+    private static BlockPos gridCell(BlockPos reference, Direction facing, int horizontal, int y) {
+        return facing.getAxis() == Direction.Axis.Z
+            ? new BlockPos(horizontal, y, reference.getZ())
+            : new BlockPos(reference.getX(), y, horizontal);
+    }
+
+    private String speciesOnSign(SignBlockEntity sign) {
+        for (int line = 0; line < 4; line++) {
+            Optional<String> species = MuseumBoneClassifier.speciesFromLabel(
+                sign.getFrontText().getMessage(line, false).getString());
+            if (species.isPresent()) return species.get();
+        }
+        return null;
+    }
+
+    private boolean signHasText(SignBlockEntity sign) {
+        for (int line = 0; line < 4; line++) {
+            if (!sign.getFrontText().getMessage(line, false).getString().isBlank()) return true;
+        }
+        return false;
+    }
+
+    private MuseumPlacement findMuseumPlacement(List<MuseumExhibit> exhibits) {
+        for (MuseumExhibit exhibit : exhibits) {
+            String species = exhibit.species();
+            if (species == null) {
+                for (int slot = 0; slot < cargo.getContainerSize(); slot++) {
+                    Optional<MuseumBone> bone = museumBone(cargo.getItem(slot));
+                    if (bone.isPresent()) {
+                        species = bone.get().species();
+                        break;
+                    }
+                }
+            }
+            if (species == null) continue;
+
+            List<String> expectedParts = MuseumBoneClassifier.expectedBoneParts(species);
+            for (int index = 0; index < expectedParts.size(); index++) {
+                String part = expectedParts.get(index);
+                ItemFrame frame = exhibit.frames().get(MuseumBoneClassifier.BONE_PARTS.indexOf(part));
+                Optional<MuseumBone> displayed = museumBone(frame.getItem());
+                if (displayed.isPresent() && displayed.get().matches(species, part)) continue;
+                if (!frame.getItem().isEmpty()) continue;
+                int cargoSlot = findCargoBone(species, part);
+                if (cargoSlot >= 0) return new MuseumPlacement(exhibit, species, part, frame, cargoSlot);
+            }
+        }
+        return null;
+    }
+
+    private int findCargoBone(String species, String part) {
+        for (int slot = 0; slot < cargo.getContainerSize(); slot++) {
+            Optional<MuseumBone> bone = museumBone(cargo.getItem(slot));
+            if (bone.isPresent() && bone.get().matches(species, part)) return slot;
+        }
+        return -1;
+    }
+
+    private Optional<MuseumBone> museumBone(ItemStack stack) {
+        if (stack.isEmpty()) return Optional.empty();
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        if (id == null) return Optional.empty();
+        Optional<String> species = MuseumBoneClassifier.speciesFor(id.getNamespace(), id.getPath());
+        Optional<String> part = MuseumBoneClassifier.bonePartFor(id.getPath());
+        return species.isPresent() && part.isPresent()
+            ? Optional.of(new MuseumBone(species.get(), part.get())) : Optional.empty();
+    }
+
+    private int countDisplayedBones(List<ItemFrame> frames, String species) {
+        int count = 0;
+        List<String> expectedParts = MuseumBoneClassifier.expectedBoneParts(species);
+        for (String part : expectedParts) {
+            int frameIndex = MuseumBoneClassifier.BONE_PARTS.indexOf(part);
+            Optional<MuseumBone> bone = museumBone(frames.get(frameIndex).getItem());
+            if (bone.isPresent() && bone.get().matches(species, part)) count++;
+        }
+        return count;
+    }
+
+    private void updateMuseumSign(SignBlockEntity sign, String species, int placed, int expected, List<String> facts) {
+        String[] lines = new String[4];
+        List<String> title = wrapForSign(MuseumBoneClassifier.displayName(species), 15, 2);
+        for (int i = 0; i < title.size(); i++) lines[i] = title.get(i);
+
+        if (facts != null) {
+            int line = title.size();
+            if (line < lines.length) lines[line++] = "Complete!";
+            String factText = facts.stream().limit(2).reduce((first, next) -> first + " " + next).orElse("");
+            List<String> wrappedFacts = wrapForSign(factText, 15, lines.length - line);
+            for (String wrapped : wrappedFacts) lines[line++] = wrapped;
+        } else {
+            int line = title.size();
+            if (line < lines.length) lines[line++] = "Bones " + placed + "/" + expected;
+            if (line < lines.length) lines[line] = "Museum exhibit";
+        }
+
+        SignText text = sign.getFrontText();
+        boolean changed = false;
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i] == null ? "" : lines[i];
+            if (!text.getMessage(i, false).getString().equals(line)) {
+                text = text.setMessage(i, Component.literal(line));
+                changed = true;
+            }
+        }
+        if (!changed) return;
+        sign.setFrontText(text);
+        sign.setChanged();
+        BlockState state = level().getBlockState(sign.getBlockPos());
+        level().sendBlockUpdated(sign.getBlockPos(), state, state, 3);
+    }
+
+    private static List<String> wrapForSign(String text, int maxCharacters, int maxLines) {
+        List<String> lines = new ArrayList<>();
+        if (maxLines <= 0 || text.isBlank()) return lines;
+        StringBuilder current = new StringBuilder();
+        for (String word : text.trim().split("\\s+")) {
+            while (word.length() > maxCharacters) {
+                if (current.length() > 0) {
+                    lines.add(current.toString());
+                    current.setLength(0);
+                    if (lines.size() >= maxLines) return lines;
+                }
+                lines.add(word.substring(0, maxCharacters));
+                word = word.substring(maxCharacters);
+                if (lines.size() >= maxLines) return lines;
+            }
+            if (current.length() > 0 && current.length() + 1 + word.length() > maxCharacters) {
+                lines.add(current.toString());
+                current.setLength(0);
+                if (lines.size() >= maxLines) return lines;
+            }
+            if (current.length() > 0) current.append(' ');
+            current.append(word);
+        }
+        if (current.length() > 0 && lines.size() < maxLines) lines.add(current.toString());
+        return lines;
+    }
+
+    private List<String> loadMuseumFacts(String species) {
+        ResourceLocation location = new ResourceLocation(
+            "fossil_finder_owl", "dinopedia/" + species + ".txt");
+        Optional<net.minecraft.server.packs.resources.Resource> resource =
+            ((ServerLevel) level()).getServer().getResourceManager().getResource(location);
+        if (resource.isEmpty()) {
+            System.getLogger(getClass().getName()).log(
+                System.Logger.Level.WARNING, "No Dinopedia entry found for " + species);
+            return List.of();
+        }
+        try (BufferedReader reader = new BufferedReader(
+            new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8))) {
+            String text = String.join(" ", reader.lines().toList());
+            return java.util.Arrays.stream(text.trim().split("(?<=[.!?])\\s+"))
+                .map(String::trim).filter(sentence -> !sentence.isEmpty()).toList();
+        } catch (IOException exception) {
+            System.getLogger(getClass().getName()).log(
+                System.Logger.Level.WARNING, "Could not read Dinopedia entry for " + species, exception);
+            return List.of();
+        }
+    }
+
+    private void reportMuseumStatus(Player owner, String dialogueKey) {
+        if (!dialogueKey.equals(museumStatusKey)) {
+            museumStatusKey = dialogueKey;
+            museumStatusCooldown = 0;
+        }
+        if (museumStatusCooldown > 0) return;
+        say(owner, dialogueKey);
+        museumStatusCooldown = 1200;
     }
 
     private void returnToOwner() {
@@ -482,6 +816,16 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             return InteractionResult.CONSUME;
         }
         if (isTame() && isOwnedBy(player)) {
+            if (!isFieldWorkMode() && museumBone(held).isPresent()) {
+                if (!addCargo(held.copyWithCount(1)).isEmpty()) {
+                    say(player, "dialogue.fossil_finder_owl.museum.cargo_full");
+                    return InteractionResult.CONSUME;
+                }
+                if (!player.getAbilities().instabuild) held.shrink(1);
+                reactHappy();
+                say(player, "dialogue.fossil_finder_owl.museum.bone_received");
+                return InteractionResult.CONSUME;
+            }
             if (held.is(OwlItems.FIELD_NOTES.get())) {
                 selectMode(player, true);
                 if (!player.getAbilities().instabuild) held.shrink(1);
@@ -581,8 +925,16 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
 
     private void say(Player player, String... dialogueKeys) {
         if (dialogueKeys.length == 0) return;
+        sayLine(player, Component.translatable(dialogueKeys[random.nextInt(dialogueKeys.length)]));
+    }
+
+    private void sayLine(Player player, String line) {
+        sayLine(player, Component.literal(line));
+    }
+
+    private void sayLine(Player player, Component line) {
         player.displayClientMessage(
-            Component.translatable(dialogueKeys[random.nextInt(dialogueKeys.length)]), false);
+            Component.empty().append(getName()).append(Component.literal(": ")).append(line), false);
     }
 
     private void reactHappy() {
@@ -714,6 +1066,17 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (initialized) onCargoChanged();
         }
     }
+
+    private record MuseumBone(String species, String part) {
+        private boolean matches(String expectedSpecies, String expectedPart) {
+            return species.equals(expectedSpecies) && part.equals(expectedPart);
+        }
+    }
+
+    private record MuseumExhibit(SignBlockEntity sign, List<ItemFrame> frames, String species) {}
+
+    private record MuseumPlacement(
+        MuseumExhibit exhibit, String species, String part, ItemFrame frame, int cargoSlot) {}
 
     private final class HatContainer extends SimpleContainer {
         private HatContainer() {

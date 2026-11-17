@@ -22,6 +22,8 @@
   "advancements.fossil_finder_owl.a_snack_for_thought.description": "Help your owl feel better with a tasty snack.",
   "advancements.fossil_finder_owl.a_dapper_companion.title": "A Dapper Companion",
   "advancements.fossil_finder_owl.a_dapper_companion.description": "Give your owl one of its very own hats.",
+  "advancements.fossil_finder_owl.opening_day.title": "Opening Day!",
+  "advancements.fossil_finder_owl.opening_day.description": "Complete a fossil exhibit with your owl.",
   "dialogue.fossil_finder_owl.museum.1": "Every specimen has a story. I do love a good story.",
   "dialogue.fossil_finder_owl.museum.2": "A quiet day among the fossils is a lovely day indeed.",
   "dialogue.fossil_finder_owl.museum.3": "I wonder what fascinating creature left that fossil behind.",
@@ -49,5 +51,11 @@
   "dialogue.fossil_finder_owl.follow.1": "Right behind you! Lead the way.",
   "dialogue.fossil_finder_owl.follow.2": "An expedition is always better with a friend.",
   "dialogue.fossil_finder_owl.stay.1": "I'll keep watch from right here.",
-  "dialogue.fossil_finder_owl.stay.2": "Very well. I'll save my energy for when you return."
+  "dialogue.fossil_finder_owl.stay.2": "Very well. I'll save my energy for when you return.",
+  "dialogue.fossil_finder_owl.museum.needs_sign": "A little exhibit sign will tell me where to begin. Place one beside the frames.",
+  "dialogue.fossil_finder_owl.museum.needs_frames": "I found a sign, but our exhibit needs a complete 4-by-2 wall of empty frames.",
+  "dialogue.fossil_finder_owl.museum.needs_species_label": "I couldn't read that exhibit label. Leave the sign blank, or write a species name on it.",
+  "dialogue.fossil_finder_owl.museum.needs_specimens": "The exhibit is ready, but I need matching fossil bones in my cargo.",
+  "dialogue.fossil_finder_owl.museum.bone_received": "A precious specimen! I'll match it to the right spot in our exhibit.",
+  "dialogue.fossil_finder_owl.museum.cargo_full": "My cargo is full, so I couldn't take that specimen. Please make room in my pack."
 }

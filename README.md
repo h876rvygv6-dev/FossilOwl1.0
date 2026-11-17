@@ -17,6 +17,7 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 ## In-game access
 - Creative inventory: spawn egg named **Blathers Spawn Egg**.
 - Creative inventory: **Museum Guide** and **Field Notes** in the Tools & Utilities tab. Owls start in museum mode; give either item to your tamed owl or add it to cargo to select museum mode or field work, respectively. Field work lets it mine fossil blocks and collect nearby drops when equipped with a suitable pickaxe.
+- Museum exhibits: place a sign beside a complete 4-by-2 wall of item frames. Leave the sign blank and the first fossil bone in cargo assigns the species, or write a species name on the sign to reserve that exhibit. The owl places one of each available bone type, updates the sign with progress, and adds Dinopedia facts when the exhibit is complete. A Megalodon uses one bone type; the shared grid still fits every species.
 - Owl milestones appear in the Advancements screen, from earning an owl's trust to fieldwork, fossil finds, snacks, and hats.
 - Creative inventory: all six 2D hat sprites are in the Combat tab. Equip one in the player's helmet slot or use it on an owned Blathers. The owl's cargo screen has a hat slot for equipping, swapping, or retrieving hats; crouch and interact empty-handed still retrieves the hat directly.
 - Hat recipes use leather, string, wool, and Fossils and Archaeology items. Hats are durable, grant +6 maximum health (+10 for the dinosaur plushie hats), and do not provide armor protection.

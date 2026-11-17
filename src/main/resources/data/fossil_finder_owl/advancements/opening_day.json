@@ -1,0 +1,23 @@
+{
+  "parent": "fossil_finder_owl:a_friend_with_feathers",
+  "display": {
+    "icon": {
+      "item": "fossil_finder_owl:museum_guide"
+    },
+    "title": {
+      "translate": "advancements.fossil_finder_owl.opening_day.title"
+    },
+    "description": {
+      "translate": "advancements.fossil_finder_owl.opening_day.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "event": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}
