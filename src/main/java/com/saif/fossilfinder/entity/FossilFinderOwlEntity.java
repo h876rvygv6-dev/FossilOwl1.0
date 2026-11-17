@@ -121,6 +121,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private final HatContainer hatContainer = new HatContainer();
     private final PickaxeContainer pickaxeContainer = new PickaxeContainer();
     private final ShovelContainer shovelContainer = new ShovelContainer();
+    private final LightContainer lightContainer = new LightContainer();
     private ItemStack pickaxe = ItemStack.EMPTY;
     private ItemStack shovel = ItemStack.EMPTY;
     private ItemStack lightItem = ItemStack.EMPTY;
@@ -178,7 +179,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     }
 
     private void setLightItem(ItemStack stack) {
-        lightItem = stack.copy();
+        lightItem = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
         entityData.set(DATA_LIGHT_ITEM, lightItem.copy());
     }
 
@@ -994,7 +995,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private void openCargo(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
             NetworkHooks.openScreen(serverPlayer, new SimpleMenuProvider((id, playerInventory, viewer) ->
-                new OwlInventoryMenu(id, playerInventory, cargo, hatContainer, pickaxeContainer, shovelContainer, getId()),
+                new OwlInventoryMenu(id, playerInventory, cargo, hatContainer, pickaxeContainer, shovelContainer,
+                    lightContainer, getId()),
                 Component.literal("Fossil Finder Owl")), buffer -> buffer.writeVarInt(getId()));
         }
     }
@@ -1089,7 +1091,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 giveShovel(player, held);
                 return InteractionResult.CONSUME;
             }
-            if (isLight(held)) {
+            if (isLightItem(held)) {
                 giveLight(player, held);
                 return InteractionResult.CONSUME;
             }
@@ -1151,7 +1153,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
         return id != null && HEALING_FOODS.contains(id.toString());
     }
-    private boolean isLight(ItemStack stack) {
+    public static boolean isLightItem(ItemStack stack) {
         return stack.is(Items.TORCH) || stack.is(Items.SOUL_TORCH) || stack.is(Items.LANTERN) || stack.is(Items.SOUL_LANTERN);
     }
     private boolean isTameGift(ItemStack stack) {
@@ -1339,6 +1341,52 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         @Override public void setItem(int slot, ItemStack stack) {
             if (slot != 0 || (!stack.isEmpty() && !canPlaceItem(slot, stack))) return;
             setItemSlot(EquipmentSlot.HEAD, stack.copy());
+        }
+
+        @Override public ItemStack removeItem(int slot, int amount) {
+            if (slot != 0 || amount <= 0) return ItemStack.EMPTY;
+            ItemStack current = getItem(slot);
+            if (current.isEmpty()) return ItemStack.EMPTY;
+
+            ItemStack removed = current.copyWithCount(Math.min(amount, current.getCount()));
+            ItemStack remaining = current.copy();
+            remaining.shrink(removed.getCount());
+            setItem(slot, remaining);
+            return removed;
+        }
+
+        @Override public ItemStack removeItemNoUpdate(int slot) {
+            if (slot != 0) return ItemStack.EMPTY;
+            ItemStack removed = getItem(slot).copy();
+            setItem(slot, ItemStack.EMPTY);
+            return removed;
+        }
+
+        @Override public void clearContent() {
+            setItem(0, ItemStack.EMPTY);
+        }
+    }
+
+    private final class LightContainer extends SimpleContainer {
+        private LightContainer() {
+            super(1);
+        }
+
+        @Override public boolean isEmpty() {
+            return lightItem.isEmpty();
+        }
+
+        @Override public ItemStack getItem(int slot) {
+            return slot == 0 ? lightItem : ItemStack.EMPTY;
+        }
+
+        @Override public boolean canPlaceItem(int slot, ItemStack stack) {
+            return slot == 0 && isLightItem(stack);
+        }
+
+        @Override public void setItem(int slot, ItemStack stack) {
+            if (slot != 0 || (!stack.isEmpty() && !canPlaceItem(slot, stack))) return;
+            setLightItem(stack);
         }
 
         @Override public ItemStack removeItem(int slot, int amount) {
