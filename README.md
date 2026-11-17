@@ -17,6 +17,7 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 ## In-game access
 - Creative inventory: spawn egg named **Blathers Spawn Egg**.
 - Creative inventory: **Museum Guide** and **Field Notes** in the Tools & Utilities tab. Owls start in museum mode; give either item to your tamed owl or add it to cargo to select museum mode or field work, respectively. Field work lets it mine fossil blocks and collect nearby drops when equipped with a suitable pickaxe.
+- Owl milestones appear in the Advancements screen, from earning an owl's trust to fieldwork, fossil finds, snacks, and hats.
 - Creative inventory: all six 2D hat sprites are in the Combat tab. Equip one in the player's helmet slot or use it on an owned Blathers. The owl's cargo screen has a hat slot for equipping, swapping, or retrieving hats; crouch and interact empty-handed still retrieves the hat directly.
 - Hat recipes use leather, string, wool, and Fossils and Archaeology items. Hats are durable, grant +6 maximum health (+10 for the dinosaur plushie hats), and do not provide armor protection.
 - Command: `/summon fossil_finder_owl:fossil_finder_owl ~ ~ ~`
@@ -24,7 +25,7 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 - Assign tool: right-click the tamed owl with an iron pickaxe.
 - Stay/follow: right-click with a vanilla bone.
 - Collect its cargo: empty-hand right-click while close to open the fossil-themed screen with 15 cargo slots, hat and pickaxe slots, and a live owl preview. Cargo from older 27-slot saves is preserved and moved into the visible slots as space becomes available.
-- Named owl easter eggs: use a name tag to name an owl **Blathers** or **Celeste** (case-insensitive) to apply that character's skin. Unnamed owls, including naturally spawning owls and spawn-egg owls, keep the default skin. Feeding a hurt owl or having it excavate ore triggers its dance.
+- Named owl easter eggs: use a name tag to name an owl **Blathers** or **Celeste** (case-insensitive) to apply that character's skin. Unnamed owls, including naturally spawning owls and spawn-egg owls, keep the default skin. Happy interactions and fossil finds trigger a dance and heart particles; owls also share occasional mode-aware chatter and event-specific lines.
 
 ## Important reconstruction notes
 - The original JAR contains intermediary-mapped Fabric bytecode, not the original Java source. This project is a clean Forge-side reconstruction, not a byte-for-byte port.

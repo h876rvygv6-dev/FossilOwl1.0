@@ -3,8 +3,10 @@ package com.saif.fossilfinder.entity;
 import com.saif.fossilfinder.menu.OwlInventoryMenu;
 import com.saif.fossilfinder.item.OwlHatItem;
 import com.saif.fossilfinder.registry.OwlItems;
+import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -88,6 +90,48 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         "minecraft:cooked_cod", "minecraft:cooked_salmon", "minecraft:beef", "minecraft:cooked_beef",
         "minecraft:porkchop", "minecraft:cooked_porkchop", "minecraft:mutton", "minecraft:cooked_mutton",
         "minecraft:chicken", "minecraft:cooked_chicken", "minecraft:rabbit", "minecraft:cooked_rabbit");
+    private static final String[] MUSEUM_DIALOGUE = {
+        "dialogue.fossil_finder_owl.museum.1",
+        "dialogue.fossil_finder_owl.museum.2",
+        "dialogue.fossil_finder_owl.museum.3",
+        "dialogue.fossil_finder_owl.museum.4"
+    };
+    private static final String[] FIELDWORK_DIALOGUE = {
+        "dialogue.fossil_finder_owl.fieldwork.1",
+        "dialogue.fossil_finder_owl.fieldwork.2",
+        "dialogue.fossil_finder_owl.fieldwork.3",
+        "dialogue.fossil_finder_owl.fieldwork.4"
+    };
+    private static final String[] TAMING_DIALOGUE = {
+        "dialogue.fossil_finder_owl.tamed.1",
+        "dialogue.fossil_finder_owl.tamed.2"
+    };
+    private static final String[] FEEDING_DIALOGUE = {
+        "dialogue.fossil_finder_owl.feeding.1",
+        "dialogue.fossil_finder_owl.feeding.2"
+    };
+    private static final String[] MODE_DIALOGUE = {
+        "dialogue.fossil_finder_owl.mode.1",
+        "dialogue.fossil_finder_owl.mode.2"
+    };
+    private static final String[] MINING_DIALOGUE = {
+        "dialogue.fossil_finder_owl.mining.1",
+        "dialogue.fossil_finder_owl.mining.2",
+        "dialogue.fossil_finder_owl.mining.3"
+    };
+    private static final String[] HAT_DIALOGUE = {
+        "dialogue.fossil_finder_owl.hat.1",
+        "dialogue.fossil_finder_owl.hat.2"
+    };
+    private static final String[] FOLLOW_DIALOGUE = {
+        "dialogue.fossil_finder_owl.follow.1",
+        "dialogue.fossil_finder_owl.follow.2"
+    };
+    private static final String[] STAY_DIALOGUE = {
+        "dialogue.fossil_finder_owl.stay.1",
+        "dialogue.fossil_finder_owl.stay.2"
+    };
+    private static final ResourceLocation ADVANCEMENT_EVENT = new ResourceLocation("fossil_finder_owl", "event");
     private static final ResourceLocation HOOT_ID = new ResourceLocation("fossil_finder_owl", "fossil_owl_hoot");
     private static final int CARGO_SIZE = 15;
 
@@ -105,6 +149,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private int scanCooldown;
     private int digTicks;
     private int alarmCooldown;
+    private int nextDialogueTick;
 
     public FossilFinderOwlEntity(EntityType<FossilFinderOwlEntity> type, Level level) {
         super(type, level);
@@ -181,6 +226,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             setNoGravity(false);
             return;
         }
+        if (getOwner() instanceof Player owner) tickAmbientDialogue(owner);
         if (isOrderedToSit()) {
             target = null;
             digTicks = 0;
@@ -247,6 +293,8 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private void handleThreat(Monster threat) {
         if (alarmCooldown <= 0) {
             playHoot(true);
+            if (getOwner() instanceof Player owner) say(owner,
+                "dialogue.fossil_finder_owl.alert.1", "dialogue.fossil_finder_owl.alert.2");
             SoundEvent mimic = threat instanceof Zombie ? SoundEvents.PARROT_IMITATE_ZOMBIE
                 : threat instanceof Skeleton ? SoundEvents.PARROT_IMITATE_SKELETON
                 : threat instanceof Creeper ? SoundEvents.PARROT_IMITATE_CREEPER
@@ -329,7 +377,12 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (!remainder.isEmpty()) level().addFreshEntity(new ItemEntity(level(), minedPos.getX() + 0.5, minedPos.getY() + 0.5, minedPos.getZ() + 0.5, remainder));
         }
         level().removeBlock(minedPos, false);
-        triggerAnim("action", "dance");
+        reactHappy();
+        Player owner = getOwner() instanceof Player playerOwner ? playerOwner : null;
+        boolean firstFossil = owner != null && awardAdvancement(owner, "digging_up_the_past");
+        if (firstFossil || random.nextInt(12) == 0) {
+            if (owner != null) say(owner, MINING_DIALOGUE);
+        }
         pickaxe.hurtAndBreak(1, this, entity -> setPickaxe(ItemStack.EMPTY));
         setPickaxe(pickaxe);
         playHoot(false);
@@ -421,19 +474,22 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (!player.getAbilities().instabuild) held.shrink(1);
             tame(player);
             setOrderedToSit(false);
-            level().broadcastEntityEvent(this, (byte) 7);
+            nextDialogueTick = tickCount + 1200 + random.nextInt(1800);
+            reactHappy();
+            awardAdvancement(player, "a_friend_with_feathers");
+            say(player, TAMING_DIALOGUE);
             player.displayClientMessage(Component.literal("The owl accepts your fossil and joins your expedition!"), true);
             return InteractionResult.CONSUME;
         }
         if (isTame() && isOwnedBy(player)) {
             if (held.is(OwlItems.FIELD_NOTES.get())) {
-                setFieldWorkMode(true);
+                selectMode(player, true);
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 player.displayClientMessage(Component.literal("Your owl heads out for field work."), true);
                 return InteractionResult.CONSUME;
             }
             if (held.is(OwlItems.MUSEUM_GUIDE.get())) {
-                setFieldWorkMode(false);
+                selectMode(player, false);
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 player.displayClientMessage(Component.literal("Your owl returns to museum mode."), true);
                 return InteractionResult.CONSUME;
@@ -441,7 +497,9 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
             if (isHealingFood(held) && getHealth() < getMaxHealth()) {
                 heal(4.0F);
                 if (!player.getAbilities().instabuild) held.shrink(1);
-                triggerAnim("action", "dance");
+                reactHappy();
+                awardAdvancement(player, "a_snack_for_thought");
+                say(player, FEEDING_DIALOGUE);
                 player.displayClientMessage(Component.literal("Your owl looks healthier."), true);
                 return InteractionResult.CONSUME;
             }
@@ -452,22 +510,28 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
                 digTicks = 0;
                 getNavigation().stop();
                 player.displayClientMessage(Component.literal(isOrderedToSit() ? "Your owl will perch here." : "Your owl will follow your expedition."), true);
+                say(player, isOrderedToSit() ? STAY_DIALOGUE : FOLLOW_DIALOGUE);
                 return InteractionResult.CONSUME;
             }
             if (isRejectedPickaxe(held)) {
                 player.displayClientMessage(Component.literal("Umm... not quite the right durability. My fossil-finding beak needs a sturdier pick!"), true);
+                say(player, "dialogue.fossil_finder_owl.pickaxe_rejected");
                 return InteractionResult.CONSUME;
             }
             if (isPickaxe(held)) {
                 setPickaxe(held.copyWithCount(1));
                 if (!player.getAbilities().instabuild) held.shrink(1);
                 target = null;
+                reactHappy();
+                say(player, "dialogue.fossil_finder_owl.pickaxe");
                 player.displayClientMessage(Component.literal("Your owl is ready for its fossil expedition!"), true);
                 return InteractionResult.CONSUME;
             }
             if (isLight(held)) {
                 setLightItem(held.copyWithCount(1));
                 if (!player.getAbilities().instabuild) held.shrink(1);
+                reactHappy();
+                say(player, "dialogue.fossil_finder_owl.light");
                 player.displayClientMessage(Component.literal("Your owl takes the light."), true);
                 return InteractionResult.CONSUME;
             }
@@ -496,6 +560,56 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
     private boolean isTameGift(ItemStack stack) {
         ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
         return id != null && TAME_ITEMS.contains(id.toString());
+    }
+
+    private void tickAmbientDialogue(Player owner) {
+        if (tickCount < nextDialogueTick) return;
+        if (distanceToSqr(owner) <= 144.0) {
+            say(owner, isFieldWorkMode() ? FIELDWORK_DIALOGUE : MUSEUM_DIALOGUE);
+            nextDialogueTick = tickCount + 2400 + random.nextInt(2401);
+        } else {
+            nextDialogueTick = tickCount + 200;
+        }
+    }
+
+    private void selectMode(Player player, boolean fieldWorkMode) {
+        setFieldWorkMode(fieldWorkMode);
+        reactHappy();
+        awardAdvancement(player, fieldWorkMode ? "field_trip" : "the_little_curator");
+        say(player, MODE_DIALOGUE);
+    }
+
+    private void say(Player player, String... dialogueKeys) {
+        if (dialogueKeys.length == 0) return;
+        player.displayClientMessage(
+            Component.translatable(dialogueKeys[random.nextInt(dialogueKeys.length)]), false);
+    }
+
+    private void reactHappy() {
+        triggerAnim("action", "dance");
+        if (level() instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.HEART,
+                getX(), getY() + getBbHeight() * 0.75, getZ(),
+                7, 0.35, 0.35, 0.35, 0.02);
+        }
+    }
+
+    private boolean awardAdvancement(Player player, String advancementId) {
+        if (!(player instanceof ServerPlayer serverPlayer) || !(level() instanceof ServerLevel serverLevel)) return false;
+        ResourceLocation id = new ResourceLocation("fossil_finder_owl", advancementId);
+        Advancement advancement = serverLevel.getServer().getAdvancements().getAdvancement(id);
+        if (advancement == null) {
+            System.getLogger(getClass().getName()).log(
+                System.Logger.Level.WARNING, "Missing advancement " + id);
+            return false;
+        }
+        return serverPlayer.getAdvancements().award(advancement, ADVANCEMENT_EVENT.getPath());
+    }
+
+    public void celebrateHatGift(Player player) {
+        reactHappy();
+        awardAdvancement(player, "a_dapper_companion");
+        say(player, HAT_DIALOGUE);
     }
 
     @Override public void addAdditionalSaveData(CompoundTag tag) {
@@ -535,6 +649,7 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         if (tag.contains("Target")) target = BlockPos.of(tag.getLong("Target"));
         suppressCargoModeChanges = false;
         setFieldWorkMode(tag.getBoolean("FieldWorkMode"));
+        nextDialogueTick = tickCount + 1200 + random.nextInt(1800);
     }
 
     @Override public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -569,8 +684,21 @@ public class FossilFinderOwlEntity extends TamableAnimal implements GeoEntity {
         lastMuseumGuideCount = museumGuideCount;
 
         if (suppressCargoModeChanges) return;
-        if (fieldNotesAdded) setFieldWorkMode(true);
-        else if (museumGuideAdded) setFieldWorkMode(false);
+        if (fieldNotesAdded) {
+            setFieldWorkMode(true);
+            if (getOwner() instanceof Player owner) {
+                reactHappy();
+                awardAdvancement(owner, "field_trip");
+                say(owner, MODE_DIALOGUE);
+            }
+        } else if (museumGuideAdded) {
+            setFieldWorkMode(false);
+            if (getOwner() instanceof Player owner) {
+                reactHappy();
+                awardAdvancement(owner, "the_little_curator");
+                say(owner, MODE_DIALOGUE);
+            }
+        }
     }
 
     private final class CargoContainer extends SimpleContainer {
