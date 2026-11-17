@@ -64,6 +64,48 @@
 				}
 			}
 		},
+		"animation.fossil_finder_owl.mining": {
+			"loop": false,
+			"animation_length": 0.65,
+			"bones": {
+				"body": {
+					"position": {
+						"vector": [0, "-math.abs(math.sin(query.anim_time * 720)) * 0.4", 0]
+					}
+				},
+				"wing1": {
+					"rotation": {
+						"vector": [0, 0, "5.0 + math.sin(query.anim_time * 720) * 55"]
+					}
+				},
+				"head": {
+					"rotation": {
+						"vector": ["-8.0 + math.sin(query.anim_time * 720) * 5", 0, 0]
+					}
+				}
+			}
+		},
+		"animation.fossil_finder_owl.shoveling": {
+			"loop": false,
+			"animation_length": 0.65,
+			"bones": {
+				"body": {
+					"position": {
+						"vector": [0, "-math.abs(math.sin(query.anim_time * 720)) * 0.7", 0]
+					}
+				},
+				"wing1": {
+					"rotation": {
+						"vector": [0, 0, "-12.0 + math.sin(query.anim_time * 720) * 42"]
+					}
+				},
+				"head": {
+					"rotation": {
+						"vector": ["-12.0 + math.sin(query.anim_time * 720) * 4", 0, 0]
+					}
+				}
+			}
+		},
 		"animation.fossil_finder_owl.flying": {
 			"loop": true,
 			"animation_length": 1.0,

@@ -17,16 +17,17 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
     private static final int CARGO_SLOTS = 15;
     private static final int HAT_SLOT = CARGO_SLOTS;
     private static final int TOOL_SLOT = HAT_SLOT + 1;
-    private static final int PLAYER_INVENTORY_START = TOOL_SLOT + 1;
+    private static final int LIGHT_SLOT = TOOL_SLOT + 1;
+    private static final int PLAYER_INVENTORY_START = LIGHT_SLOT + 1;
     private final int owlEntityId;
 
     public OwlInventoryMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buffer) {
         this(containerId, playerInventory, new SimpleContainer(CARGO_SLOTS), new SimpleContainer(1),
-            new SimpleContainer(1), buffer.readVarInt());
+            new SimpleContainer(1), new SimpleContainer(1), buffer.readVarInt());
     }
 
     public OwlInventoryMenu(int containerId, Inventory playerInventory, Container cargo, Container hat,
-                            Container tool, int owlEntityId) {
+                            Container tool, Container light, int owlEntityId) {
         super(OWL_INVENTORY.get(), containerId);
         this.owlEntityId = owlEntityId;
 
@@ -51,7 +52,19 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
         addSlot(new Slot(tool, 0, 5, 30) {
             @Override
             public boolean mayPlace(ItemStack stack) {
-                return FossilFinderOwlEntity.isPickaxe(stack);
+                return FossilFinderOwlEntity.isExcavationTool(stack);
+            }
+
+            @Override
+            public int getMaxStackSize() {
+                return 1;
+            }
+        });
+
+        addSlot(new Slot(light, 0, 5, 47) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return FossilFinderOwlEntity.isLightItem(stack);
             }
 
             @Override
@@ -81,17 +94,21 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
             carried = stack.copy();
             boolean moved;
 
-            if (index < CARGO_SLOTS || index == HAT_SLOT || index == TOOL_SLOT) {
+            if (index < PLAYER_INVENTORY_START) {
                 moved = this.moveItemStackTo(stack, PLAYER_INVENTORY_START, this.slots.size(), true);
             } else {
                 moved = false;
                 Slot hatSlot = this.slots.get(HAT_SLOT);
                 Slot toolSlot = this.slots.get(TOOL_SLOT);
+                Slot lightSlot = this.slots.get(LIGHT_SLOT);
                 if (stack.getItem() instanceof OwlHatItem && !hatSlot.hasItem()) {
                     moved = this.moveItemStackTo(stack, HAT_SLOT, HAT_SLOT + 1, false);
                 }
-                if (!stack.isEmpty() && FossilFinderOwlEntity.isPickaxe(stack) && !toolSlot.hasItem()) {
+                if (!stack.isEmpty() && FossilFinderOwlEntity.isExcavationTool(stack) && !toolSlot.hasItem()) {
                     moved = this.moveItemStackTo(stack, TOOL_SLOT, TOOL_SLOT + 1, false);
+                }
+                if (!stack.isEmpty() && FossilFinderOwlEntity.isLightItem(stack) && !lightSlot.hasItem()) {
+                    moved = this.moveItemStackTo(stack, LIGHT_SLOT, LIGHT_SLOT + 1, false);
                 }
                 if (!stack.isEmpty()) {
                     moved |= this.moveItemStackTo(stack, 0, CARGO_SLOTS, false);
