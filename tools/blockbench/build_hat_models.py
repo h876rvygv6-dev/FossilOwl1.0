@@ -130,15 +130,6 @@ def build_hat(source_path, item_id):
         for context, transform in project.get("display", {}).items()
         if context in DISPLAY_CONTEXTS
     }
-    if "head" in display:
-        head_transform = dict(display["head"])
-        head_translation = list(head_transform.get("translation", [0, 0, 0]))
-        if len(head_translation) != 3:
-            raise ValueError(f"{source_path.name}: invalid head translation")
-        # Positive Y head offsets push the model down in the entity's mirrored render space.
-        head_translation[1] = 0
-        head_transform["translation"] = head_translation
-        display["head"] = head_transform
 
     model = {
         "parent": "minecraft:block/block",
