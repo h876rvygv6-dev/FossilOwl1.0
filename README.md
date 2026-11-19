@@ -25,7 +25,7 @@ This is a reconstructed Forge port based on the supplied Fabric v2.0.0 JAR and F
 - Tame: right-click with one of `fossil:fossil_bio`, `fossil:fossil_plant`, `fossil:fossil_shale`, or `fossil:fossil_tar`.
 - Assign tool: right-click the tamed owl with an iron pickaxe or shovel.
 - Stay/follow: right-click with a vanilla bone.
-- Collect its cargo: empty-hand right-click while close to open the fossil-themed screen with 15 cargo slots, hat, tool, and light slots, and a live owl preview. The tool slot accepts pickaxes or shovels; the light slot accepts torches and lanterns. Cargo from older 27-slot saves is preserved and moved into the visible slots as space becomes available.
+- Collect its cargo: empty-hand right-click while close to open the fossil-themed screen with 15 cargo slots, separate hat, pickaxe, shovel, and lantern slots, and a centered owl preview. Cargo from older 27-slot saves is preserved and moved into the visible slots as space becomes available.
 - Named owl easter eggs: use a name tag to name an owl **Blathers** or **Celeste** (case-insensitive) to apply that character's skin. Unnamed owls, including naturally spawning owls and spawn-egg owls, keep the default skin. Happy interactions and fossil finds trigger a dance and heart particles; owls also share occasional mode-aware chatter and event-specific lines.
 
 ## Important reconstruction notes

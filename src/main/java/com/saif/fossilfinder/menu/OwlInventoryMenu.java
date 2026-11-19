@@ -16,28 +16,31 @@ import static com.saif.fossilfinder.registry.OwlMenus.OWL_INVENTORY;
 public class OwlInventoryMenu extends AbstractContainerMenu {
     private static final int CARGO_SLOTS = 15;
     private static final int HAT_SLOT = CARGO_SLOTS;
-    private static final int TOOL_SLOT = HAT_SLOT + 1;
-    private static final int LIGHT_SLOT = TOOL_SLOT + 1;
+    private static final int PICKAXE_SLOT = HAT_SLOT + 1;
+    private static final int SHOVEL_SLOT = PICKAXE_SLOT + 1;
+    private static final int LIGHT_SLOT = SHOVEL_SLOT + 1;
     private static final int PLAYER_INVENTORY_START = LIGHT_SLOT + 1;
+    private static final int[] CARGO_COLUMN_X = {141, 161, 182, 202, 223};
+    private static final int[] CARGO_ROW_Y = {29, 55, 80};
     private final int owlEntityId;
 
     public OwlInventoryMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buffer) {
         this(containerId, playerInventory, new SimpleContainer(CARGO_SLOTS), new SimpleContainer(1),
-            new SimpleContainer(1), new SimpleContainer(1), buffer.readVarInt());
+            new SimpleContainer(1), new SimpleContainer(1), new SimpleContainer(1), buffer.readVarInt());
     }
 
     public OwlInventoryMenu(int containerId, Inventory playerInventory, Container cargo, Container hat,
-                            Container tool, Container light, int owlEntityId) {
+                            Container pickaxe, Container shovel, Container light, int owlEntityId) {
         super(OWL_INVENTORY.get(), containerId);
         this.owlEntityId = owlEntityId;
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 5; col++) {
-                addSlot(new Slot(cargo, row * 5 + col, 73 + col * 17, 13 + row * 17));
+                addSlot(new Slot(cargo, row * 5 + col, CARGO_COLUMN_X[col], CARGO_ROW_Y[row]));
             }
         }
 
-        addSlot(new Slot(hat, 0, 5, 13) {
+        addSlot(new Slot(hat, 0, 54, 30) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.getItem() instanceof OwlHatItem;
@@ -49,10 +52,10 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
             }
         });
 
-        addSlot(new Slot(tool, 0, 5, 30) {
+        addSlot(new Slot(pickaxe, 0, 14, 53) {
             @Override
             public boolean mayPlace(ItemStack stack) {
-                return FossilFinderOwlEntity.isExcavationTool(stack);
+                return FossilFinderOwlEntity.isPickaxe(stack);
             }
 
             @Override
@@ -61,7 +64,19 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
             }
         });
 
-        addSlot(new Slot(light, 0, 5, 47) {
+        addSlot(new Slot(shovel, 0, 14, 77) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return FossilFinderOwlEntity.isShovel(stack);
+            }
+
+            @Override
+            public int getMaxStackSize() {
+                return 1;
+            }
+        });
+
+        addSlot(new Slot(light, 0, 14, 99) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return FossilFinderOwlEntity.isLightItem(stack);
@@ -75,12 +90,12 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(playerInventory, col + row * 9 + 9, 5 + col * 17, 74 + row * 17));
+                addSlot(new Slot(playerInventory, col + row * 9 + 9, 47 + col * 18, 128 + row * 25));
             }
         }
 
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(playerInventory, col, 5 + col * 17, 126));
+            addSlot(new Slot(playerInventory, col, 47 + col * 18, 202));
         }
     }
 
@@ -99,13 +114,17 @@ public class OwlInventoryMenu extends AbstractContainerMenu {
             } else {
                 moved = false;
                 Slot hatSlot = this.slots.get(HAT_SLOT);
-                Slot toolSlot = this.slots.get(TOOL_SLOT);
+                Slot pickaxeSlot = this.slots.get(PICKAXE_SLOT);
+                Slot shovelSlot = this.slots.get(SHOVEL_SLOT);
                 Slot lightSlot = this.slots.get(LIGHT_SLOT);
                 if (stack.getItem() instanceof OwlHatItem && !hatSlot.hasItem()) {
                     moved = this.moveItemStackTo(stack, HAT_SLOT, HAT_SLOT + 1, false);
                 }
-                if (!stack.isEmpty() && FossilFinderOwlEntity.isExcavationTool(stack) && !toolSlot.hasItem()) {
-                    moved = this.moveItemStackTo(stack, TOOL_SLOT, TOOL_SLOT + 1, false);
+                if (!stack.isEmpty() && FossilFinderOwlEntity.isPickaxe(stack) && !pickaxeSlot.hasItem()) {
+                    moved = this.moveItemStackTo(stack, PICKAXE_SLOT, PICKAXE_SLOT + 1, false);
+                }
+                if (!stack.isEmpty() && FossilFinderOwlEntity.isShovel(stack) && !shovelSlot.hasItem()) {
+                    moved = this.moveItemStackTo(stack, SHOVEL_SLOT, SHOVEL_SLOT + 1, false);
                 }
                 if (!stack.isEmpty() && FossilFinderOwlEntity.isLightItem(stack) && !lightSlot.hasItem()) {
                     moved = this.moveItemStackTo(stack, LIGHT_SLOT, LIGHT_SLOT + 1, false);
